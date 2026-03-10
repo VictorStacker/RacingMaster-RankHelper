@@ -25,7 +25,7 @@ class VehicleRepository:
         self.session = session
     
     def save_vehicles(self, vehicles: List[VehicleData]) -> None:
-        """保存车辆数据（替换现有数据）
+        """保存车辆数据（增量更新，保留车库关联）
         
         Args:
             vehicles: 车辆数据列表
@@ -34,21 +34,30 @@ class VehicleRepository:
             DatabaseError: 数据库操作失败
         """
         try:
-            # 清空现有数据
-            self.session.query(Vehicle).delete()
-            
-            # 插入新数据
+            # 使用 name + tier 作为唯一标识进行增量更新
             for vehicle_data in vehicles:
-                vehicle = Vehicle(
-                    name=vehicle_data.name,
-                    category=vehicle_data.category.value,
-                    tier=vehicle_data.tier,
-                    lap_time=vehicle_data.lap_time
-                )
-                self.session.add(vehicle)
+                # 查找现有车辆
+                existing = self.session.query(Vehicle).filter(
+                    Vehicle.name == vehicle_data.name,
+                    Vehicle.tier == vehicle_data.tier
+                ).first()
+                
+                if existing:
+                    # 更新现有车辆数据
+                    existing.category = vehicle_data.category.value
+                    existing.lap_time = vehicle_data.lap_time
+                else:
+                    # 插入新车辆
+                    vehicle = Vehicle(
+                        name=vehicle_data.name,
+                        category=vehicle_data.category.value,
+                        tier=vehicle_data.tier,
+                        lap_time=vehicle_data.lap_time
+                    )
+                    self.session.add(vehicle)
             
             self.session.commit()
-            logger.info(f"成功保存 {len(vehicles)} 条车辆数据")
+            logger.info(f"成功保存 {len(vehicles)} 条车辆数据（增量更新）")
             
         except SQLAlchemyError as e:
             self.session.rollback()
