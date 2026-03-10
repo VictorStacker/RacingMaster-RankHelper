@@ -63,4 +63,4 @@
 ---
 
 **项目**: RacingMaster-RankHelper  
-**仓库**: https://github.com/your-username/RacingMaster-RankHelper
+**仓库**: https://github.com/VictorStacker/RacingMaster-RankHelper
