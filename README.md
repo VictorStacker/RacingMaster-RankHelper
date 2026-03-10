@@ -55,116 +55,6 @@
 
 ![排位车辆推荐](screenshots/screenshot-recommendation.png)
 
-## 🚀 快速开始
-
-### 前置要求
-
-- Python 3.10 或更高版本
-- pip 包管理器
-
-### 安装步骤
-
-1. **克隆仓库**
-```bash
-git clone https://github.com/your-username/RacingMaster-RankHelper.git
-cd RacingMaster-RankHelper
-```
-
-2. **安装依赖**
-```bash
-pip install -r requirements.txt
-```
-
-或使用 Poetry：
-```bash
-poetry install
-```
-
-3. **安装 Playwright 浏览器**（用于数据更新）
-```bash
-playwright install chromium
-```
-
-### 启动应用
-
-**图形界面（推荐）：**
-```bash
-python run_gui.py
-```
-
-**命令行界面：**
-```bash
-python run.py
-```
-
-## 📖 使用指南
-
-### 1. 更新车辆数据库
-首次使用时，从菜单栏选择 `数据 → 更新数据库` 来获取最新的车辆圈速数据。
-
-### 2. 管理车库
-- 在"我的车库"标签页中，点击"添加车辆"按钮
-- 从下拉列表中选择车辆和阶数
-- 使用内联"调整"按钮快速升阶
-- 支持多账号管理，可在不同账号间切换
-
-### 3. 生成推荐
-- 切换到"排位车辆推荐"标签页
-- 选择你的最高联赛等级
-- 系统自动匹配对应的计分车辆数量
-- 点击"生成推荐"查看最优组合
-- 可手动调整计分车辆数量以适应特殊情况
-
-### 4. 联赛等级说明
-
-| 联赛等级 | 极限组 | 性能组 | 运动组 | 总计 |
-|---------|-------|-------|-------|------|
-| 新秀联赛1 | 2 | 2 | 2 | 6 |
-| 新秀联赛2 | 3 | 3 | 3 | 9 |
-| 新秀联赛3 | 4 | 4 | 4 | 12 |
-| 新秀联赛4 | 5 | 5 | 5 | 15 |
-| 精英联赛1 | 6 | 6 | 6 | 18 |
-| 精英联赛2 | 7 | 6 | 6 | 19 |
-| 精英联赛3 | 7 | 7 | 6 | 20 |
-| 精英联赛4 | 7 | 7 | 7 | 21 |
-| 精英联赛5 | 8 | 7 | 7 | 22 |
-| 精英联赛6 | 8 | 8 | 7 | 23 |
-| 精英联赛7 | 8 | 8 | 8 | 24 |
-| 精英联赛8 | 9 | 8 | 8 | 25 |
-| 精英联赛9 | 9 | 9 | 8 | 26 |
-| 巅峰联赛 | 9 | 9 | 9 | 27 |
-
-## 🏗️ 项目结构
-
-```
-peak-speed-ranking/
-├── peak_speed/              # 主应用程序代码
-│   ├── models/              # 数据模型（数据类和数据库模型）
-│   ├── repositories/        # 数据访问层（车辆、车库、账号）
-│   ├── engines/             # 业务逻辑引擎（排名、推荐）
-│   ├── crawler/             # 网页数据爬虫
-│   ├── ui/                  # PyQt6 图形界面
-│   │   ├── main_window.py   # 主窗口
-│   │   ├── ranking_view.py  # 排行榜视图
-│   │   ├── garage_view.py   # 车库视图
-│   │   └── recommendation_view.py  # 推荐视图
-│   ├── io/                  # 数据导入导出
-│   └── main.py              # 应用程序入口
-├── tests/                   # 测试代码
-├── run_gui.py               # GUI启动脚本
-├── run.py                   # CLI启动脚本
-└── pyproject.toml           # 项目配置
-```
-
-## 🛠️ 技术栈
-
-- **语言**: Python 3.10+
-- **GUI框架**: PyQt6
-- **数据库**: SQLite + SQLAlchemy ORM
-- **网页爬虫**: Playwright
-- **测试**: pytest + Hypothesis
-- **依赖管理**: Poetry
-
 ## 🤝 贡献
 
 欢迎贡献代码、报告问题或提出新功能建议！
@@ -198,7 +88,6 @@ peak-speed-ranking/
 
 如果这个项目对你有帮助，请给一个 ⭐️ Star！
 
-Made with ❤️ by the community
+Made with ❤️ for RacingMaster Players
 
 </div>
- 
