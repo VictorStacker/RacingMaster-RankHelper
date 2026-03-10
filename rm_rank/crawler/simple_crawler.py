@@ -77,14 +77,21 @@ class SimpleCrawler:
         try:
             # 查找 ALL_DATA 变量
             # 匹配模式: const ALL_DATA = {...} 或 var ALL_DATA = {...}
-            pattern = r'(?:const|var|let)\s+ALL_DATA\s*=\s*(\{[^;]+\});'
+            pattern = r'(?:const|var|let)\s+ALL_DATA\s*=\s*(\{.+?\});'
             match = re.search(pattern, html, re.DOTALL)
             
             if match:
-                json_str = match.group(1)
-                all_data = json.loads(json_str)
+                js_str = match.group(1)
                 
-                logger.info("成功找到 ALL_DATA 变量")
+                # 使用更安全的方式：直接解析 JavaScript 对象结构
+                # 而不是转换为 JSON
+                all_data = self._parse_js_object(js_str)
+                
+                if not all_data:
+                    logger.error("无法解析 JavaScript 对象")
+                    return []
+                
+                logger.info("成功找到并解析 ALL_DATA 变量")
                 
                 # 组别映射
                 group_mapping = {
@@ -101,15 +108,16 @@ class SimpleCrawler:
                         
                         for car_name, lap_times in group_data.items():
                             # lap_times 是一个数组，包含 0-5 阶的圈速
-                            for tier in range(0, 6):  # 0-5 阶
-                                if tier < len(lap_times):
-                                    vehicle = {
-                                        "name": car_name,
-                                        "category": group_name,
-                                        "tier": tier,
-                                        "lap_time": lap_times[tier]
-                                    }
-                                    vehicles_data.append(vehicle)
+                            if isinstance(lap_times, list):
+                                for tier in range(0, 6):  # 0-5 阶
+                                    if tier < len(lap_times):
+                                        vehicle = {
+                                            "name": car_name,
+                                            "category": group_name,
+                                            "tier": tier,
+                                            "lap_time": lap_times[tier]
+                                        }
+                                        vehicles_data.append(vehicle)
                 
                 if vehicles_data:
                     logger.info(f"成功提取 {len(vehicles_data)} 条车辆配置数据")
@@ -117,9 +125,59 @@ class SimpleCrawler:
             
             logger.warning("未找到 ALL_DATA 变量")
             
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON 解析失败: {e}")
         except Exception as e:
             logger.error(f"解析 HTML 时出错: {e}", exc_info=True)
         
         return []
+    
+    def _parse_js_object(self, js_str: str) -> dict:
+        """解析 JavaScript 对象（不转换为 JSON）
+        
+        Args:
+            js_str: JavaScript 对象字符串
+            
+        Returns:
+            解析后的字典
+        """
+        try:
+            # 移除注释
+            js_str = re.sub(r'//.*?$', '', js_str, flags=re.MULTILINE)
+            js_str = re.sub(r'/\*.*?\*/', '', js_str, flags=re.DOTALL)
+            
+            # 使用 eval 解析（在受控环境中是安全的）
+            # 将 JavaScript 对象语法转换为 Python 字典语法
+            # 1. 将无引号的键名转换为字符串
+            # 2. 保持字符串值不变
+            
+            # 简单的方法：使用 ast.literal_eval 的变体
+            # 但首先需要将 JS 对象转换为 Python 字典格式
+            
+            # 更简单的方法：直接使用正则表达式提取数据
+            result = {}
+            
+            # 匹配每个组别: group_name: { ... }
+            group_pattern = r'(\w+):\s*\{([^}]+(?:\{[^}]+\}[^}]*)*)\}'
+            for group_match in re.finditer(group_pattern, js_str):
+                group_name = group_match.group(1)
+                group_content = group_match.group(2)
+                
+                # 解析组别内的车辆数据
+                # 匹配: "车名": [数字, 数字, ...]
+                vehicle_pattern = r'"([^"]+)":\s*\[([^\]]+)\]'
+                vehicles = {}
+                
+                for vehicle_match in re.finditer(vehicle_pattern, group_content):
+                    car_name = vehicle_match.group(1)
+                    lap_times_str = vehicle_match.group(2)
+                    
+                    # 解析圈速数组
+                    lap_times = [float(x.strip()) for x in lap_times_str.split(',')]
+                    vehicles[car_name] = lap_times
+                
+                result[group_name] = vehicles
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"解析 JavaScript 对象失败: {e}", exc_info=True)
+            return {}
