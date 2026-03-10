@@ -4,7 +4,7 @@
 
 [简体中文](README.md) | [English](README_EN.md)
 
-A data-driven decision support tool designed for Peak Speed game players to optimize ranked race vehicle selection strategies.
+A data-driven decision support tool for RacingMaster game players to optimize ranked race vehicle selection.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -12,26 +12,26 @@ A data-driven decision support tool designed for Peak Speed game players to opti
 
 </div>
 
-## ✨ Features
+## ✨ Key Features
 
 ### 🏆 Vehicle Rankings
 - Real-time lap time data for all vehicles
 - Filter by category (Extreme/Performance/Sports)
 - Sort by lap time, tier, or category
-- Clean table display
+- Clear table display for easy viewing
 
 ### 🚗 My Garage
-- Multi-account management
+- Multi-account management with easy switching
 - Add/remove vehicles with custom tiers
 - Inline adjustment buttons for quick tier upgrades
 - Auto-sort by lap time
 
 ### 🎯 Ranked Vehicle Recommendations
-- **Smart League System**: Support for 14 league levels (Rookie League 1 → Peak League)
-- **Precise Scoring Vehicle Configuration**: Different scoring vehicle counts for each league level
-- **Category-based Recommendations**: Independent recommendations for Extreme, Performance, and Sports
-- **All Recommendations**: Combined recommendations sorted by total lap time
-- **Flexible Adjustment**: Manual adjustment of scoring vehicle counts (for season week restrictions)
+- **Smart League System**: Supports 14 league levels (Rookie League 1 → Peak League)
+- **Precise Scoring Vehicle Configuration**: Each league level has different scoring vehicle counts
+- **Category-based Recommendations**: Independent recommendations for Extreme, Performance, and Sports categories
+- **All Categories Recommendation**: Combined recommendations across all categories, sorted by total lap time
+- **Flexible Adjustment**: Manually adjust scoring vehicle counts (adapt to seasonal restrictions)
 
 ### 💾 Data Management
 - Auto-update vehicle database from website
@@ -62,7 +62,7 @@ Smart recommendations based on league level to help you climb the leaderboard.
 - Python 3.10 or higher
 - pip package manager
 
-### Installation
+### Installation Steps
 
 1. **Clone the repository**
 ```bash
@@ -80,7 +80,7 @@ Or using Poetry:
 poetry install
 ```
 
-3. **Install Playwright browsers** (for data updates)
+3. **Install Playwright browser** (for data updates)
 ```bash
 playwright install chromium
 ```
@@ -106,14 +106,14 @@ On first use, select `Data → Update Database` from the menu bar to fetch the l
 - In the "My Garage" tab, click the "Add Vehicle" button
 - Select vehicle and tier from dropdown lists
 - Use inline "Adjust" buttons for quick tier upgrades
-- Support multi-account management with easy switching
+- Supports multi-account management, switch between different accounts
 
 ### 3. Generate Recommendations
-- Switch to "Ranked Vehicle Recommendations" tab
+- Switch to the "Ranked Vehicle Recommendations" tab
 - Select your highest league level
-- System automatically matches corresponding scoring vehicle count
+- System automatically matches corresponding scoring vehicle counts
 - Click "Generate Recommendations" to view optimal combinations
-- Manually adjust scoring vehicle count for special situations
+- Manually adjust scoring vehicle counts to adapt to special situations
 
 ### 4. League Level Reference
 
@@ -134,12 +134,34 @@ On first use, select `Data → Update Database` from the menu bar to fetch the l
 | Elite League 9 | 9 | 9 | 8 | 26 |
 | Peak League | 9 | 9 | 9 | 27 |
 
+## 🏗️ Project Structure
+
+```
+peak-speed-ranking/
+├── peak_speed/              # Main application code
+│   ├── models/              # Data models (data classes and database models)
+│   ├── repositories/        # Data access layer (vehicles, garage, accounts)
+│   ├── engines/             # Business logic engines (ranking, recommendations)
+│   ├── crawler/             # Web data crawler
+│   ├── ui/                  # PyQt6 GUI
+│   │   ├── main_window.py   # Main window
+│   │   ├── ranking_view.py  # Rankings view
+│   │   ├── garage_view.py   # Garage view
+│   │   └── recommendation_view.py  # Recommendations view
+│   ├── io/                  # Data import/export
+│   └── main.py              # Application entry point
+├── tests/                   # Test code
+├── run_gui.py               # GUI launch script
+├── run.py                   # CLI launch script
+└── pyproject.toml           # Project configuration
+```
+
 ## 🛠️ Tech Stack
 
 - **Language**: Python 3.10+
 - **GUI Framework**: PyQt6
 - **Database**: SQLite + SQLAlchemy ORM
-- **Web Scraper**: Playwright
+- **Web Scraping**: Playwright
 - **Testing**: pytest + Hypothesis
 - **Dependency Management**: Poetry
 
@@ -147,7 +169,11 @@ On first use, select `Data → Update Database` from the menu bar to fetch the l
 
 Contributions, issues, and feature requests are welcome!
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+1. Fork this repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ## 📝 Changelog
 
@@ -172,6 +198,6 @@ This tool is for educational and research purposes only. Users are responsible f
 
 If this project helps you, please give it a ⭐️ Star!
 
-Made with ❤️ by the community
+Made with ❤️ for RacingMaster Players
 
 </div>
