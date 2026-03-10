@@ -74,6 +74,9 @@ class AccountManagementDialog(QDialog):
         self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         
+        # 隐藏ID列（保留数据用于后续操作）
+        self.table.setColumnHidden(0, True)
+        
         # 双击切换账号
         self.table.doubleClicked.connect(self.switch_account)
         

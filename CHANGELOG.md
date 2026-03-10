@@ -36,14 +36,6 @@
   - 全部推荐（综合排序）
   - 手动调整计分车辆数量
 
-### 技术栈
-- Python 3.10+
-- PyQt6 (GUI)
-- SQLAlchemy + SQLite (数据库)
-- Playwright 
-- pytest + Hypothesis (测试)
-
----
 
 ## 版本说明
 
