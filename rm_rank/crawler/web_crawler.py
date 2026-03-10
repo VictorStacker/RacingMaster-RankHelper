@@ -29,7 +29,21 @@ class WebCrawler:
         """
         try:
             async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=True)
+                # 尝试使用已安装的浏览器
+                try:
+                    browser = await p.chromium.launch(headless=True)
+                except Exception as browser_error:
+                    # 如果浏览器未安装，抛出友好的错误信息
+                    raise CrawlerError(
+                        "浏览器驱动未安装。\n\n"
+                        "如果您使用的是打包版本（.exe），请按以下步骤操作：\n"
+                        "1. 下载并安装 Python 3.10+\n"
+                        "2. 打开命令提示符（CMD）\n"
+                        "3. 运行命令：pip install playwright\n"
+                        "4. 运行命令：playwright install chromium\n\n"
+                        "或者，您可以从源码运行本程序。"
+                    )
+                
                 page = await browser.new_page()
                 page.set_default_timeout(CRAWLER_TIMEOUT)
                 

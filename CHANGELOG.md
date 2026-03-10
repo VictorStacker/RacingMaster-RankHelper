@@ -40,7 +40,7 @@
 - Python 3.10+
 - PyQt6 (GUI)
 - SQLAlchemy + SQLite (数据库)
-- Playwright (网页爬虫)
+- Playwright 
 - pytest + Hypothesis (测试)
 
 ---

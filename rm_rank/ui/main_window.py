@@ -49,7 +49,12 @@ class MainWindow(QMainWindow):
         self.combination_repo = CombinationRepository(self.session)
         self.ranking_engine = RankingEngine(self.vehicle_repo)
         self.recommendation_engine = RecommendationEngine(self.ranking_engine)
-        self.crawler = WebCrawler()
+        
+        # 优先使用简单爬虫（不需要浏览器），如果失败则尝试 Playwright
+        from rm_rank.crawler import SimpleCrawler
+        self.crawler = SimpleCrawler()
+        self.use_simple_crawler = True
+        
         self.validator = DataValidator()
         
         # 初始化导入导出
@@ -212,7 +217,8 @@ class MainWindow(QMainWindow):
         def crawler_func():
             """爬虫函数，返回 (success, message, data)"""
             try:
-                vehicles = self.crawler.fetch_all_vehicles_sync()
+                # 使用简单爬虫（不需要浏览器）
+                vehicles = self.crawler.fetch_all_vehicles()
                 self.vehicle_repo.save_vehicles(vehicles)
                 return True, f"成功更新 {len(vehicles)} 条数据", vehicles
             except Exception as e:
