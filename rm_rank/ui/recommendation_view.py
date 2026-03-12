@@ -29,14 +29,63 @@ LEAGUE_CONFIGS = {
     "巅峰联赛": (9, 9, 9),
 }
 
+# 周次规则配置：每个组别在不同周次下的计分车辆数
+# 格式：(第1-2周, 第3-4周, 第5-7周)
+WEEK_SCORING_RULES = {
+    "极限组": (5, 7, 9),
+    "性能组": (5, 7, 9),
+    "运动组": (5, 7, 9),
+}
+
+# 背景色配置：对应三档计分车辆数
+SCORING_COLORS = [
+    QColor(200, 255, 200),  # 第1档：浅绿色 (1-2周)
+    QColor(200, 230, 255),  # 第2档：浅蓝色 (3-4周)
+    QColor(230, 230, 230),  # 第3档：浅灰色 (5-7周)
+]
+
+# 验证颜色配置
+assert len(SCORING_COLORS) == 3, "SCORING_COLORS 必须包含3种颜色"
+
+
+def get_scoring_color(category_name: str, category_rank: int) -> QColor:
+    """根据组别和组别内排名获取背景色
+    
+    Args:
+        category_name: 组别名称（"极限组"/"性能组"/"运动组"）
+        category_rank: 车辆在该组别内的排名位置（从1开始）
+    
+    Returns:
+        QColor对象，如果不在计分范围内则返回默认白色
+    """
+    if category_rank <= 0:
+        logger.warning(f"无效的组别内排名: {category_rank}")
+        return QColor(255, 255, 255)  # 白色
+    
+    if category_name not in WEEK_SCORING_RULES:
+        logger.warning(f"未知组别: {category_name}")
+        return QColor(255, 255, 255)  # 白色
+    
+    tier1, tier2, tier3 = WEEK_SCORING_RULES[category_name]
+    
+    if category_rank <= tier1:
+        return SCORING_COLORS[0]  # 第1档
+    elif category_rank <= tier2:
+        return SCORING_COLORS[1]  # 第2档
+    elif category_rank <= tier3:
+        return SCORING_COLORS[2]  # 第3档
+    else:
+        return QColor(255, 255, 255)  # 白色
+
 
 class RecommendationView(QWidget):
     """推荐视图组件"""
     
-    def __init__(self, recommendation_engine: RecommendationEngine, garage_repo: GarageRepository):
+    def __init__(self, recommendation_engine: RecommendationEngine, garage_repo: GarageRepository, tuning_service=None):
         super().__init__()
         self.recommendation_engine = recommendation_engine
         self.garage_repo = garage_repo
+        self.tuning_service = tuning_service  # 调教服务（可选）
         self._updating_from_league = False  # 防止循环更新
         self.init_ui()
         
@@ -108,29 +157,62 @@ class RecommendationView(QWidget):
         # 创建标签页
         self.tabs = QTabWidget()
         
-        # 全部推荐标签页
-        self.all_table = self.create_table()
+        # 全部推荐标签页（保持原有5列）
+        self.all_table = self.create_table(include_category=True, include_tuning=False)
         self.tabs.addTab(self.all_table, "全部推荐")
         
-        # 极限组标签页
-        self.extreme_table = self.create_table()
+        # 极限组标签页（4列+调教推荐）
+        self.extreme_table = self.create_table(include_category=False, include_tuning=True)
         self.tabs.addTab(self.extreme_table, "极限组")
         
-        # 性能组标签页
-        self.performance_table = self.create_table()
+        # 性能组标签页（4列+调教推荐）
+        self.performance_table = self.create_table(include_category=False, include_tuning=True)
         self.tabs.addTab(self.performance_table, "性能组")
         
-        # 运动组标签页
-        self.sports_table = self.create_table()
+        # 运动组标签页（4列+调教推荐）
+        self.sports_table = self.create_table(include_category=False, include_tuning=True)
         self.tabs.addTab(self.sports_table, "运动组")
         
         layout.addWidget(self.tabs)
+        
+        # 联赛计分车辆数规则说明（放在表格下方）
+        scoring_info_label = QLabel(
+            "联赛计分车辆数规则：\n"
+            "• 第1-2周：每组5辆（极限组5辆、性能组5辆、运动组5辆，总计15辆）\n"
+            "• 第3-4周：每组7辆（极限组7辆、性能组7辆、运动组7辆，总计21辆）\n"
+            "• 第5-7周：每组9辆（极限组9辆、性能组9辆、运动组9辆，总计27辆）\n"
+            "表格背景色根据车辆在其所属组别内的排名位置设置"
+        )
+        scoring_info_label.setStyleSheet(
+            "color: #333; font-size: 12px; padding: 8px 10px; "
+            "background-color: #f5f5f5; border-radius: 3px; "
+            "border: 1px solid #ddd;"
+        )
+        scoring_info_label.setWordWrap(True)
+        layout.addWidget(scoring_info_label)
     
-    def create_table(self):
-        """创建表格"""
+    def create_table(self, include_category=True, include_tuning=False):
+        """创建表格
+        
+        Args:
+            include_category: 是否包含"组别"列
+            include_tuning: 是否包含"调教推荐"列
+        """
         table = QTableWidget()
-        table.setColumnCount(5)
-        table.setHorizontalHeaderLabels(["排名", "车型", "组别", "阶数", "圈速总和(秒)"])
+        
+        # 根据参数设置列数和标题
+        if include_category and not include_tuning:
+            # 全部推荐：排名、车型、组别、阶数、圈速总和
+            table.setColumnCount(5)
+            table.setHorizontalHeaderLabels(["排名", "车型", "组别", "阶数", "圈速总和(秒)"])
+        elif not include_category and include_tuning:
+            # 分组标签页：排名、车型、阶数、圈速、调教推荐
+            table.setColumnCount(5)
+            table.setHorizontalHeaderLabels(["排名", "车型", "阶数", "圈速(秒)", "调教推荐"])
+        else:
+            # 默认：排名、车型、组别、阶数、圈速总和
+            table.setColumnCount(5)
+            table.setHorizontalHeaderLabels(["排名", "车型", "组别", "阶数", "圈速总和(秒)"])
         
         # 设置表格属性
         table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -140,14 +222,29 @@ class RecommendationView(QWidget):
         header = table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)  # 排名列固定
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)  # 车型列拉伸
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)  # 组别列固定
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)  # 阶数列固定
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)  # 圈速列固定
         
-        table.setColumnWidth(0, 50)   # 排名列
-        table.setColumnWidth(2, 80)   # 组别列
-        table.setColumnWidth(3, 60)   # 阶数列
-        table.setColumnWidth(4, 120)  # 圈速列
+        if include_category and not include_tuning:
+            # 全部推荐表格
+            header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)  # 组别列固定
+            header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)  # 阶数列固定
+            header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)  # 圈速列固定
+            
+            table.setColumnWidth(0, 50)   # 排名列
+            table.setColumnWidth(2, 80)   # 组别列
+            table.setColumnWidth(3, 60)   # 阶数列
+            table.setColumnWidth(4, 120)  # 圈速列
+        elif not include_category and include_tuning:
+            # 分组标签页表格
+            header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)  # 阶数列固定
+            header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)  # 圈速列固定
+            header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)  # 调教推荐列拉伸
+            
+            table.setColumnWidth(0, 50)   # 排名列
+            table.setColumnWidth(2, 60)   # 阶数列
+            table.setColumnWidth(3, 100)  # 圈速列
+            
+            # 设置调教列支持文本换行
+            table.setWordWrap(True)
         
         return table
         
@@ -231,11 +328,11 @@ class RecommendationView(QWidget):
                 f"极限组: {extreme_result.count}辆 ({extreme_result.total_lap_time:.1f} s)"
             )
             
-            # 更新各个表格（全部推荐不高亮前3名）
-            self.update_table(self.all_table, all_result, highlight_top3=False)
-            self.update_table(self.sports_table, sports_result)
-            self.update_table(self.performance_table, performance_result)
-            self.update_table(self.extreme_table, extreme_result)
+            # 更新各个表格
+            self.update_table(self.all_table, all_result, include_category=True, include_tuning=False)
+            self.update_table(self.sports_table, sports_result, include_category=False, include_tuning=True)
+            self.update_table(self.performance_table, performance_result, include_category=False, include_tuning=True)
+            self.update_table(self.extreme_table, extreme_result, include_category=False, include_tuning=True)
             
             # 更新标签页标题，显示数量
             self.tabs.setTabText(0, f"全部推荐 ({all_result.count})")
@@ -247,16 +344,24 @@ class RecommendationView(QWidget):
             logger.error(f"生成推荐失败: {str(e)}", exc_info=True)
             QMessageBox.critical(self, "错误", f"生成推荐失败：{str(e)}")
     
-    def update_table(self, table, result, highlight_top3=True):
+    def update_table(self, table, result, include_category=True, include_tuning=False):
         """更新表格数据
         
         Args:
             table: 要更新的表格
             result: 推荐结果
-            highlight_top3: 是否高亮显示前3名，默认True
+            include_category: 是否包含"组别"列
+            include_tuning: 是否包含"调教推荐"列
         """
         # 清空表格
         table.setRowCount(0)
+        
+        # 初始化组别内排名计数器
+        category_counters = {
+            "极限组": 0,
+            "性能组": 0,
+            "运动组": 0,
+        }
         
         # 填充推荐数据
         for ranked_vehicle in result.vehicles:
@@ -264,34 +369,81 @@ class RecommendationView(QWidget):
             table.insertRow(row)
             
             v = ranked_vehicle.vehicle
+            category_name = v.category.value
             
-            # 创建表格项并设置居中对齐
+            # 更新该组别的计数器
+            category_counters[category_name] += 1
+            category_rank = category_counters[category_name]
+            
+            # 根据组别内排名确定背景色
+            color = get_scoring_color(category_name, category_rank)
+            
+            # 创建表格项
+            col = 0
+            
+            # 排名列
             rank_item = QTableWidgetItem(str(ranked_vehicle.rank))
             rank_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            rank_item.setBackground(color)
+            table.setItem(row, col, rank_item)
+            col += 1
             
+            # 车型列
             name_item = QTableWidgetItem(v.name)
             name_item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            name_item.setBackground(color)
+            table.setItem(row, col, name_item)
+            col += 1
             
-            category_item = QTableWidgetItem(v.category.value)
-            category_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            # 组别列（仅在include_category=True时）
+            if include_category:
+                category_item = QTableWidgetItem(category_name)
+                category_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                category_item.setBackground(color)
+                table.setItem(row, col, category_item)
+                col += 1
             
+            # 阶数列
             tier_item = QTableWidgetItem(str(v.tier))
             tier_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            tier_item.setBackground(color)
+            table.setItem(row, col, tier_item)
+            col += 1
             
+            # 圈速列
             lap_time_item = QTableWidgetItem(f"{v.lap_time:.1f} s")
             lap_time_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            lap_time_item.setBackground(color)
+            table.setItem(row, col, lap_time_item)
+            col += 1
             
-            # 高亮显示前3名（如果启用）
-            if highlight_top3 and ranked_vehicle.rank <= 3:
-                color = QColor(255, 255, 200)  # 浅黄色
-                rank_item.setBackground(color)
-                name_item.setBackground(color)
-                category_item.setBackground(color)
-                tier_item.setBackground(color)
-                lap_time_item.setBackground(color)
+            # 调教推荐列（仅在include_tuning=True时）
+            if include_tuning:
+                tuning_text = self._get_tuning_recommendation(v.name, v.tier)
+                tuning_item = QTableWidgetItem(tuning_text)
+                tuning_item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+                tuning_item.setBackground(color)
+                table.setItem(row, col, tuning_item)
+                
+                # 自动调整行高以适应调教数据
+                if "\n" in tuning_text:
+                    table.resizeRowToContents(row)
+    
+    def _get_tuning_recommendation(self, vehicle_name: str, vehicle_tier: int) -> str:
+        """获取调教推荐
+        
+        Args:
+            vehicle_name: 车辆名称
+            vehicle_tier: 车辆阶位
             
-            table.setItem(row, 0, rank_item)
-            table.setItem(row, 1, name_item)
-            table.setItem(row, 2, category_item)
-            table.setItem(row, 3, tier_item)
-            table.setItem(row, 4, lap_time_item)
+        Returns:
+            调教推荐文本
+        """
+        if not self.tuning_service:
+            return "未启用"
+        
+        try:
+            return self.tuning_service.get_tuning_recommendation(vehicle_name, vehicle_tier)
+        except Exception as e:
+            logger.error(f"获取调教推荐失败: {str(e)}", exc_info=True)
+            return "加载失败"

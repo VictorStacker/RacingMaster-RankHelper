@@ -1,6 +1,7 @@
 [tool.poetry]
 name = "racingmaster-rankhelper"
-version = "1.0.0"
+version = "1.1.0"
+
 description = "巅峰极速车辆数据及排位计分车推荐 - RacingMaster-RankHelper"
 authors = ["VictorStacker"]
 readme = "README.md"

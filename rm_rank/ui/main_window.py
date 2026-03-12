@@ -55,6 +55,13 @@ class MainWindow(QMainWindow):
         self.crawler = SimpleCrawler()
         self.use_simple_crawler = True
         
+        # 初始化调教服务
+        from rm_rank.tuning import TuningService, DatabaseManager, TuningCache, TuningParser
+        self.tuning_db_manager = DatabaseManager(str(config.TUNING_DATABASE_PATH))
+        self.tuning_cache = TuningCache()
+        self.tuning_parser = TuningParser()
+        self.tuning_service = TuningService(self.tuning_db_manager, self.tuning_cache)
+        
         self.validator = DataValidator()
         
         # 初始化导入导出
@@ -133,6 +140,12 @@ class MainWindow(QMainWindow):
         crawl_action.triggered.connect(self.crawl_data)
         data_menu.addAction(crawl_action)
         
+        data_menu.addSeparator()
+        
+        reset_tuning_action = QAction("重置车辆数据库(&R)", self)
+        reset_tuning_action.triggered.connect(self.reset_tuning_database)
+        data_menu.addAction(reset_tuning_action)
+        
         # 账号菜单
         account_menu = menubar.addMenu("账号(&A)")
         
@@ -175,7 +188,8 @@ class MainWindow(QMainWindow):
         # 推荐视图
         self.recommendation_view = RecommendationView(
             self.recommendation_engine, 
-            self.garage_repo
+            self.garage_repo,
+            self.tuning_service
         )
         self.tabs.addTab(self.recommendation_view, "排位车辆推荐")
         
@@ -217,10 +231,37 @@ class MainWindow(QMainWindow):
         def crawler_func():
             """爬虫函数，返回 (success, message, data)"""
             try:
-                # 使用简单爬虫（不需要浏览器）
-                vehicles = self.crawler.fetch_all_vehicles()
+                # 使用简单爬虫一键获取所有数据（圈速+调教）
+                vehicles, tuning_html = self.crawler.fetch_all_data()
+                
+                # 保存圈速数据
                 self.vehicle_repo.save_vehicles(vehicles)
-                return True, f"成功更新 {len(vehicles)} 条数据", vehicles
+                
+                # 处理调教数据
+                tuning_count = 0
+                if tuning_html:
+                    try:
+                        # 解析调教数据
+                        tuning_data_list = self.tuning_parser.parse_tuning_data(tuning_html)
+                        
+                        # 保存到数据库
+                        for tuning_data in tuning_data_list:
+                            self.tuning_db_manager.save_tuning_data(tuning_data)
+                            tuning_count += 1
+                        
+                        # 清空缓存
+                        self.tuning_cache.clear()
+                        
+                        logger.info(f"成功保存 {tuning_count} 条调教数据")
+                    except Exception as e:
+                        logger.warning(f"调教数据处理失败: {str(e)}", exc_info=True)
+                        # 调教数据失败不影响圈速数据的成功
+                
+                message = f"成功更新 {len(vehicles)} 条圈速数据"
+                if tuning_count > 0:
+                    message += f"，{tuning_count} 条调教数据"
+                
+                return True, message, vehicles
             except Exception as e:
                 logger.error(f"更新数据库失败: {str(e)}", exc_info=True)
                 return False, str(e), []
@@ -233,6 +274,62 @@ class MainWindow(QMainWindow):
         # 刷新所有视图
         self.refresh_all()
         self.statusBar().showMessage("数据更新完成", 3000)
+    
+    def reset_tuning_database(self):
+        """重置车辆数据库"""
+        # 获取当前数据统计
+        try:
+            tuning_count = self.tuning_db_manager.get_tuning_data_count()
+            vehicle_count = self.vehicle_repo.get_vehicle_count()
+        except Exception:
+            tuning_count = 0
+            vehicle_count = 0
+        
+        # 显示确认对话框
+        reply = QMessageBox.warning(
+            self,
+            "确认重置",
+            f"确定要重置车辆数据库吗？\n\n"
+            f"当前数据库包含：\n"
+            f"• {vehicle_count} 条车辆圈速数据\n"
+            f"• {tuning_count} 条调教数据\n\n"
+            f"此操作将清空所有车辆相关数据，但不会影响账号和车库数据。\n\n"
+            f"重置后建议立即执行'更新数据库'以重新获取最新数据。",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            # 重置车辆圈速数据
+            cleared_vehicles = self.vehicle_repo.clear_all_vehicles()
+            
+            # 重置调教数据库
+            self.tuning_db_manager.reset_tuning_data()
+            
+            # 清空缓存
+            self.tuning_cache.clear()
+            
+            # 刷新视图
+            self.refresh_all()
+            
+            # 显示成功消息
+            QMessageBox.information(
+                self,
+                "重置成功",
+                f"车辆数据库已成功重置！\n\n"
+                f"已清空：\n"
+                f"• {cleared_vehicles} 条车辆圈速数据\n"
+                f"• {tuning_count} 条调教数据\n\n"
+                f"建议现在执行'数据(D) - 更新数据库'以重新获取最新数据。"
+            )
+            
+            self.statusBar().showMessage("车辆数据库已重置", 3000)
+            
+        except Exception as e:
+            logger.error(f"重置车辆数据库失败: {str(e)}", exc_info=True)
+            ErrorDialog.show_exception(self, e)
             
     def refresh_all(self):
         """刷新所有视图"""
@@ -247,7 +344,7 @@ class MainWindow(QMainWindow):
             self,
             "关于",
             "<h3>巅峰极速车辆数据及排位计分车推荐</h3>"
-            "<p>版本: 1.0.0</p>"
+            "<p>版本: 1.1.0</p>"
             "<p>一个数据驱动的决策支持工具，帮助玩家优化排位赛车辆选择。</p>"
         )
     

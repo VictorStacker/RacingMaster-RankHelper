@@ -18,6 +18,7 @@ class SimpleCrawler:
     def __init__(self, url: str = DATA_SOURCE_URL):
         self.url = url
         self.validator = DataValidator()
+        self.tuning_url = "https://waylongrank.top/index.html"
     
     def fetch_all_vehicles(self) -> List[VehicleData]:
         """爬取所有车辆数据
@@ -181,3 +182,54 @@ class SimpleCrawler:
         except Exception as e:
             logger.error(f"解析 JavaScript 对象失败: {e}", exc_info=True)
             return {}
+
+    def fetch_tuning_data(self) -> str:
+        """抓取调教数据页面
+        
+        Returns:
+            HTML内容字符串
+            
+        Raises:
+            CrawlerError: 网站不可访问或请求失败
+        """
+        try:
+            logger.info(f"正在访问调教数据页面 {self.tuning_url}")
+            
+            # 发送 HTTP 请求
+            req = urllib.request.Request(
+                self.tuning_url,
+                headers={'User-Agent': 'Mozilla/5.0'}
+            )
+            
+            with urllib.request.urlopen(req, timeout=30) as response:
+                html = response.read().decode('utf-8')
+            
+            logger.info("成功获取调教数据页面")
+            return html
+            
+        except urllib.error.URLError as e:
+            raise CrawlerError(f"网络连接失败: {str(e)}")
+        except Exception as e:
+            logger.error(f"获取调教数据失败: {str(e)}", exc_info=True)
+            raise CrawlerError(f"调教数据更新失败: {str(e)}")
+    
+    def fetch_all_data(self) -> tuple:
+        """一键获取所有数据（圈速+调教）
+        
+        Returns:
+            tuple: (圈速数据列表, 调教HTML内容或None)
+            
+        Raises:
+            CrawlerError: 圈速数据获取失败时抛出
+        """
+        # 获取圈速数据
+        vehicles_data = self.fetch_all_vehicles()
+        
+        # 获取调教数据（失败不影响圈速数据）
+        tuning_html = None
+        try:
+            tuning_html = self.fetch_tuning_data()
+        except CrawlerError as e:
+            logger.warning(f"调教数据获取失败，但圈速数据已成功获取: {str(e)}")
+        
+        return vehicles_data, tuning_html

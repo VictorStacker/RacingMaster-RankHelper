@@ -39,7 +39,7 @@ from cx_Freeze import setup, Executable
 
 setup(
     name="RacingMaster-RankHelper",
-    version="1.0.0",
+    version="1.1.0",
     description="巅峰极速车辆数据及排位计分车推荐",
     executables=[Executable("run_gui.py", base="Win32GUI", target_name="RacingMaster-RankHelper.exe")]
 )

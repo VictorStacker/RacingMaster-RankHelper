@@ -136,6 +136,38 @@ class VehicleRepository:
             logger.error(f"获取车辆失败: {str(e)}")
             return None
     
+    def clear_all_vehicles(self) -> int:
+        """清空所有车辆数据
+        
+        Returns:
+            删除的车辆数量
+            
+        Raises:
+            DatabaseError: 数据库操作失败
+        """
+        try:
+            count = self.session.query(Vehicle).count()
+            self.session.query(Vehicle).delete()
+            self.session.commit()
+            logger.info(f"成功清空 {count} 条车辆数据")
+            return count
+        except SQLAlchemyError as e:
+            self.session.rollback()
+            logger.error(f"清空车辆数据失败: {str(e)}", exc_info=True)
+            raise DatabaseError(f"清空数据失败: {str(e)}")
+    
+    def get_vehicle_count(self) -> int:
+        """获取车辆总数
+        
+        Returns:
+            车辆数量
+        """
+        try:
+            return self.session.query(Vehicle).count()
+        except SQLAlchemyError as e:
+            logger.error(f"获取车辆数量失败: {str(e)}")
+            return 0
+    
     @staticmethod
     def _to_vehicle_config(vehicle: Vehicle) -> VehicleConfig:
         """将 ORM 模型转换为 Pydantic 模型

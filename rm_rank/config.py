@@ -3,8 +3,8 @@ import os
 from pathlib import Path
 
 # 应用程序配置
-APP_NAME = "peak-speed-ranking"
-APP_VERSION = "0.1.0"
+APP_NAME = "racingmaster-rankhelper"
+APP_VERSION = "1.1.0"
 
 # 数据目录
 DATA_DIR = Path.home() / f".{APP_NAME}"
@@ -13,6 +13,9 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 # 数据库配置
 DATABASE_PATH = DATA_DIR / "database.db"
 DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
+
+# 调教数据库配置
+TUNING_DATABASE_PATH = DATA_DIR / "tuning_data.db"
 
 # 日志配置
 LOG_DIR = DATA_DIR / "logs"

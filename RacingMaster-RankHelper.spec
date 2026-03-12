@@ -1,9 +1,17 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
+import sys
+import os
+
+# 添加项目根目录到路径
+sys.path.insert(0, os.path.abspath('.'))
+
+# 导入版本号
+from rm_rank.config import APP_VERSION
 
 datas = [('rm_rank', 'rm_rank')]
 binaries = []
-hiddenimports = ['rm_rank', 'rm_rank.ui', 'rm_rank.models', 'rm_rank.engines', 'rm_rank.repositories', 'rm_rank.crawler', 'rm_rank.io', 'PyQt6', 'playwright', 'sqlalchemy', 'pydantic']
+hiddenimports = ['rm_rank', 'rm_rank.ui', 'rm_rank.models', 'rm_rank.engines', 'rm_rank.repositories', 'rm_rank.crawler', 'rm_rank.io', 'rm_rank.tuning', 'PyQt6', 'playwright', 'sqlalchemy', 'pydantic', 'bs4']
 tmp_ret = collect_all('PyQt6')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('playwright')
@@ -31,7 +39,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='RacingMaster-RankHelper',
+    name=f'RacingMaster-RankHelper-v{APP_VERSION}',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -44,5 +52,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='NONE',
+    icon='icon.ico',
 )
