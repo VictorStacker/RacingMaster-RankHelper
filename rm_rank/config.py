@@ -4,7 +4,7 @@ from pathlib import Path
 
 # 应用程序配置
 APP_NAME = "racingmaster-rankhelper"
-APP_VERSION = "1.3"
+APP_VERSION = "1.4"
 
 # 数据目录
 DATA_DIR = Path.home() / f".{APP_NAME}"
