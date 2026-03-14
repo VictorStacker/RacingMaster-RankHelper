@@ -102,7 +102,12 @@ class RecommendationView(QWidget):
         self.league_combo = QComboBox()
         for league_name in LEAGUE_CONFIGS.keys():
             self.league_combo.addItem(league_name, league_name)
-        self.league_combo.setCurrentText("精英联赛5")  # 默认精英联赛5
+        
+        # 读取上次使用的联赛等级，默认精英联赛5
+        from rm_rank.config import load_preferences
+        prefs = load_preferences()
+        saved_league = prefs.get("last_league", "精英联赛5")
+        self.league_combo.setCurrentText(saved_league)
         self.league_combo.currentIndexChanged.connect(self.on_league_changed)
         control_layout.addWidget(self.league_combo)
         
@@ -263,6 +268,12 @@ class RecommendationView(QWidget):
                 if self.vehicle_count_combo.itemData(i) == config:
                     self.vehicle_count_combo.setCurrentIndex(i)
                     break
+            
+            # 保存用户选择
+            from rm_rank.config import load_preferences, save_preferences
+            prefs = load_preferences()
+            prefs["last_league"] = league_name
+            save_preferences(prefs)
         
         self._updating_from_league = False
     

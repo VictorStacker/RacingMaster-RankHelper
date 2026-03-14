@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QTabWidget, QMenuBar, QMenu, QToolBar, QStatusBar, QMessageBox, QFileDialog
+    QTabWidget, QMenuBar, QMenu, QToolBar, QStatusBar, QMessageBox, QFileDialog, QDialog
 )
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtCore import Qt
@@ -14,6 +14,7 @@ from rm_rank.ui.recommendation_view import RecommendationView
 from rm_rank.ui.dialogs import ErrorDialog
 from rm_rank.ui.progress_dialog import ProgressDialog
 from rm_rank.ui.account_dialog import AccountManagementDialog
+from rm_rank.ui.account_selection_dialog import AccountSelectionDialog
 from rm_rank.repositories import VehicleRepository, GarageRepository, CombinationRepository, AccountRepository
 from rm_rank.engines import RankingEngine, RecommendationEngine
 from rm_rank.crawler import WebCrawler
@@ -66,10 +67,10 @@ class MainWindow(QMainWindow):
         
         # 初始化导入导出
         self.exporter = DataExporter(
-            self.vehicle_repo, self.garage_repo, self.combination_repo
+            self.vehicle_repo, self.garage_repo, self.combination_repo, self.account_repo
         )
         self.importer = DataImporter(
-            self.vehicle_repo, self.garage_repo, self.combination_repo, self.validator
+            self.vehicle_repo, self.garage_repo, self.combination_repo, self.validator, self.account_repo
         )
         
         self.init_ui()
@@ -102,24 +103,12 @@ class MainWindow(QMainWindow):
         # 导入子菜单
         import_menu = file_menu.addMenu("导入(&I)")
         
-        import_vehicles_action = QAction("导入车辆数据(&V)", self)
-        import_vehicles_action.triggered.connect(self.import_vehicles)
-        import_menu.addAction(import_vehicles_action)
-        
         import_garage_action = QAction("导入车库数据(&G)", self)
         import_garage_action.triggered.connect(self.import_garage)
         import_menu.addAction(import_garage_action)
         
         # 导出子菜单
         export_menu = file_menu.addMenu("导出(&E)")
-        
-        export_vehicles_action = QAction("导出车辆数据(&V)", self)
-        export_vehicles_action.triggered.connect(self.export_vehicles)
-        export_menu.addAction(export_vehicles_action)
-        
-        export_garage_action = QAction("导出车库数据(&G)", self)
-        export_garage_action.triggered.connect(self.export_garage)
-        export_menu.addAction(export_garage_action)
         
         export_all_action = QAction("导出所有数据(&A)", self)
         export_all_action.triggered.connect(self.export_all)
@@ -181,7 +170,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.ranking_view, "车辆排行榜")
         
         # 车库视图
-        self.garage_view = GarageView(self.garage_repo, self.vehicle_repo, self.account_repo)
+        self.garage_view = GarageView(self.garage_repo, self.vehicle_repo, self.account_repo, self.ranking_engine)
         self.garage_view.account_changed.connect(self.on_account_changed)
         self.tabs.addTab(self.garage_view, "我的车库")
         
@@ -334,6 +323,7 @@ class MainWindow(QMainWindow):
     def refresh_all(self):
         """刷新所有视图"""
         self.ranking_view.refresh()
+        self.garage_view.load_accounts()
         self.garage_view.refresh()
         self.recommendation_view.refresh()
         self.statusBar().showMessage("已刷新", 3000)
@@ -344,7 +334,7 @@ class MainWindow(QMainWindow):
             self,
             "关于",
             "<h3>巅峰极速车辆数据及排位计分车推荐</h3>"
-            "<p>版本: 1.1.0</p>"
+            "<p>版本: 1.3</p>"
             "<p>一个数据驱动的决策支持工具，帮助玩家优化排位赛车辆选择。</p>"
         )
     
@@ -374,9 +364,91 @@ class MainWindow(QMainWindow):
             return
         
         try:
-            count = self.importer.import_garage(Path(file_path), clear_existing=False)
-            ErrorDialog.show_success(self, f"成功导入 {count} 辆车辆到车库")
-            self.refresh_all()
+            import json
+            
+            # 读取文件以检测格式
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # 检查是否为多账号格式
+            if 'accounts' in data and isinstance(data['accounts'], list):
+                # 多账号格式，显示账号选择对话框
+                accounts_data = data['accounts']
+                
+                if not accounts_data:
+                    ErrorDialog.show_error(self, "文件中没有账号数据")
+                    return
+                
+                # 显示账号选择对话框
+                dialog = AccountSelectionDialog(accounts_data, self)
+                if dialog.exec() == QDialog.DialogCode.Accepted:
+                    selected_accounts = dialog.get_selected_accounts()
+                    
+                    if not selected_accounts:
+                        ErrorDialog.show_error(self, "未选择任何账号")
+                        return
+                    
+                    # 导入选中的账号
+                    count = self.importer.import_garage(Path(file_path), clear_existing=False, selected_accounts=selected_accounts)
+                    ErrorDialog.show_success(self, f"成功导入 {count} 辆车辆到车库")
+                    self.refresh_all()
+            else:
+                # 单账号格式，直接导入
+                count = self.importer.import_garage(Path(file_path), clear_existing=False)
+                ErrorDialog.show_success(self, f"成功导入 {count} 辆车辆到车库")
+                self.refresh_all()
+                
+        except Exception as e:
+            ErrorDialog.show_exception(self, e)
+    
+    def import_all(self):
+        """导入所有数据（车库和组合）"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "导入所有数据", "", "JSON 文件 (*.json)"
+        )
+        
+        if not file_path:
+            return
+        
+        try:
+            import json
+            
+            # 读取文件以检测格式
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # 检查是否为多账号格式
+            if 'accounts' in data and isinstance(data['accounts'], list):
+                # 多账号格式，显示账号选择对话框
+                accounts_data = data['accounts']
+                
+                if not accounts_data:
+                    ErrorDialog.show_error(self, "文件中没有账号数据")
+                    return
+                
+                # 显示账号选择对话框
+                dialog = AccountSelectionDialog(accounts_data, self)
+                if dialog.exec() == QDialog.DialogCode.Accepted:
+                    selected_accounts = dialog.get_selected_accounts()
+                    
+                    if not selected_accounts:
+                        ErrorDialog.show_error(self, "未选择任何账号")
+                        return
+                    
+                    # 导入选中的账号
+                    result = self.importer.import_all_accounts(Path(file_path), clear_existing=False, selected_accounts=selected_accounts)
+                    
+                    # 构建成功消息
+                    message = "成功导入数据：\n"
+                    for account_name, counts in result.items():
+                        message += f"• {account_name}: {counts['garage']} 辆车库车辆, {counts['combination']} 个组合\n"
+                    
+                    ErrorDialog.show_success(self, message)
+                    self.refresh_all()
+            else:
+                # 单账号格式，显示错误
+                ErrorDialog.show_error(self, "此文件不是完整的多账号数据格式，请使用'导入车库数据'功能")
+                
         except Exception as e:
             ErrorDialog.show_exception(self, e)
     
@@ -412,17 +484,16 @@ class MainWindow(QMainWindow):
     
     def export_all(self):
         """导出所有数据"""
-        directory = QFileDialog.getExistingDirectory(self, "选择导出目录")
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "导出所有数据", "all_data.json", "JSON 文件 (*.json)"
+        )
         
-        if not directory:
+        if not file_path:
             return
         
         try:
-            files = self.exporter.export_all(Path(directory))
-            message = "成功导出所有数据：\n"
-            for key, path in files.items():
-                message += f"• {key}: {path.name}\n"
-            ErrorDialog.show_success(self, message)
+            self.exporter.export_all(Path(file_path))
+            ErrorDialog.show_success(self, f"成功导出所有数据到 {file_path}")
         except Exception as e:
             ErrorDialog.show_exception(self, e)
     

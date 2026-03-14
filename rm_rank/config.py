@@ -4,7 +4,7 @@ from pathlib import Path
 
 # 应用程序配置
 APP_NAME = "racingmaster-rankhelper"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.3"
 
 # 数据目录
 DATA_DIR = Path.home() / f".{APP_NAME}"
@@ -28,3 +28,28 @@ CRAWLER_TIMEOUT = 30000  # 毫秒
 
 # 推荐配置
 DEFAULT_RECOMMENDATION_LIMIT = 9
+
+# 用户偏好设置文件
+PREFERENCES_FILE = DATA_DIR / "preferences.json"
+
+
+def load_preferences() -> dict:
+    """读取用户偏好设置"""
+    if PREFERENCES_FILE.exists():
+        import json
+        try:
+            with open(PREFERENCES_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def save_preferences(prefs: dict) -> None:
+    """保存用户偏好设置"""
+    import json
+    try:
+        with open(PREFERENCES_FILE, "w", encoding="utf-8") as f:
+            json.dump(prefs, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass

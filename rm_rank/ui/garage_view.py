@@ -17,11 +17,12 @@ class GarageView(QWidget):
     # 信号：账号切换时发出
     account_changed = pyqtSignal(int)
     
-    def __init__(self, garage_repo: GarageRepository, vehicle_repo: VehicleRepository, account_repo: AccountRepository = None):
+    def __init__(self, garage_repo: GarageRepository, vehicle_repo: VehicleRepository, account_repo: AccountRepository = None, ranking_engine=None):
         super().__init__()
         self.garage_repo = garage_repo
         self.vehicle_repo = vehicle_repo
         self.account_repo = account_repo
+        self.ranking_engine = ranking_engine
         self._updating_account = False  # 防止递归更新
         self.init_ui()
         
@@ -56,7 +57,7 @@ class GarageView(QWidget):
         add_button.clicked.connect(self.add_vehicle)
         button_layout.addWidget(add_button)
         
-        self.delete_button = QPushButton("删除")
+        self.delete_button = QPushButton("移出车库")
         self.delete_button.clicked.connect(self.toggle_delete_mode)
         button_layout.addWidget(self.delete_button)
         
@@ -104,7 +105,7 @@ class GarageView(QWidget):
         """创建表格"""
         table = QTableWidget()
         table.setColumnCount(7)  # 增加一列用于操作按钮
-        table.setHorizontalHeaderLabels(["", "ID", "车型", "组别", "阶数", "圈速总和(秒)", "操作"])
+        table.setHorizontalHeaderLabels(["", "总榜", "车型", "组别", "阶数", "圈速(秒)", "操作"])
         
         # 设置表格属性
         table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -140,6 +141,12 @@ class GarageView(QWidget):
             # 按圈速排序（从小到大）
             vehicles.sort(key=lambda v: v.lap_time)
             
+            # 建立总榜排名映射 {vehicle_id: rank}
+            rank_map = {}
+            if self.ranking_engine:
+                all_ranked = self.ranking_engine.generate_ranking()
+                rank_map = {rv.vehicle.id: rv.rank for rv in all_ranked}
+            
             # 按组别分类
             from rm_rank.models.data_models import Category
             all_vehicles = vehicles
@@ -148,10 +155,10 @@ class GarageView(QWidget):
             extreme_vehicles = [v for v in vehicles if v.category == Category.EXTREME]
             
             # 更新各个表格
-            self.update_table(self.all_table, all_vehicles)
-            self.update_table(self.extreme_table, extreme_vehicles)
-            self.update_table(self.performance_table, performance_vehicles)
-            self.update_table(self.sports_table, sports_vehicles)
+            self.update_table(self.all_table, all_vehicles, rank_map)
+            self.update_table(self.extreme_table, extreme_vehicles, rank_map)
+            self.update_table(self.performance_table, performance_vehicles, rank_map)
+            self.update_table(self.sports_table, sports_vehicles, rank_map)
             
             # 更新标签页标题，显示数量
             self.tabs.setTabText(0, f"全部 ({len(all_vehicles)})")
@@ -162,7 +169,7 @@ class GarageView(QWidget):
         except Exception as e:
             logger.error(f"刷新车库失败: {str(e)}", exc_info=True)
     
-    def update_table(self, table, vehicles):
+    def update_table(self, table, vehicles, rank_map=None):
         """更新表格数据"""
         # 清空表格
         table.setRowCount(0)
@@ -179,9 +186,10 @@ class GarageView(QWidget):
             checkbox.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             table.setItem(row, 0, checkbox)
             
-            # 其他列并设置居中对齐
-            id_item = QTableWidgetItem(str(v.id))
-            id_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            # 总榜排名
+            rank = rank_map.get(v.id, "-") if rank_map else "-"
+            rank_item = QTableWidgetItem(str(rank))
+            rank_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             
             name_item = QTableWidgetItem(v.name)
             name_item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
@@ -195,7 +203,7 @@ class GarageView(QWidget):
             lap_time_item = QTableWidgetItem(f"{v.lap_time:.1f} s")
             lap_time_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             
-            table.setItem(row, 1, id_item)
+            table.setItem(row, 1, rank_item)
             table.setItem(row, 2, name_item)
             table.setItem(row, 3, category_item)
             table.setItem(row, 4, tier_item)
@@ -280,7 +288,7 @@ class GarageView(QWidget):
         
         if self.delete_mode:
             # 进入删除模式
-            self.delete_button.setText("确认删除")
+            self.delete_button.setText("确认移出")
             self.delete_button.setStyleSheet("background-color: #f44336; color: white;")
             
             # 显示所有表格的勾选框列
@@ -292,7 +300,7 @@ class GarageView(QWidget):
             self.remove_checked_vehicles()
             
             # 然后恢复UI状态
-            self.delete_button.setText("删除")
+            self.delete_button.setText("移出车库")
             self.delete_button.setStyleSheet("")
             
             # 隐藏所有表格的勾选框列并取消所有勾选
@@ -330,8 +338,8 @@ class GarageView(QWidget):
         # 确认删除
         reply = QMessageBox.question(
             self,
-            "确认删除",
-            f"确定要删除选中的 {len(vehicles_to_delete)} 辆车吗？",
+            "确认移出",
+            f"确定要将选中的 {len(vehicles_to_delete)} 辆车移出车库吗？",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         
@@ -344,7 +352,7 @@ class GarageView(QWidget):
                     logger.error(f"删除车辆失败: {str(e)}", exc_info=True)
             
             self.refresh()
-            QMessageBox.information(self, "成功", f"已删除 {len(vehicles_to_delete)} 辆车")
+            QMessageBox.information(self, "成功", f"已将 {len(vehicles_to_delete)} 辆车移出车库")
                     
     def remove_vehicle(self):
         """删除选中的车辆"""
@@ -384,37 +392,28 @@ class GarageView(QWidget):
     
     def load_accounts(self):
         """加载账号列表到下拉框"""
-        if not self.account_repo or self._updating_account:
+        if not self.account_repo:
             return
         
         try:
             self._updating_account = True
             
-            # 保存当前选中的账号ID
-            current_account_id = None
-            if self.account_combo.count() > 0:
-                current_account_id = self.account_combo.currentData()
-            
             # 清空下拉框
             self.account_combo.clear()
             
-            # 获取所有账号
+            # 获取所有账号和当前激活账号
             accounts = self.account_repo.get_all_accounts()
             active_account = self.account_repo.get_active_account()
             
             # 添加到下拉框
             for account in accounts:
                 display_text = account.name
-                if account.is_active:
+                if active_account and account.id == active_account.id:
                     display_text += " ✓"
                 self.account_combo.addItem(display_text, account.id)
             
-            # 恢复选中或选中激活账号
-            if current_account_id:
-                index = self.account_combo.findData(current_account_id)
-                if index >= 0:
-                    self.account_combo.setCurrentIndex(index)
-            elif active_account:
+            # 始终选中激活账号
+            if active_account:
                 index = self.account_combo.findData(active_account.id)
                 if index >= 0:
                     self.account_combo.setCurrentIndex(index)
@@ -434,25 +433,15 @@ class GarageView(QWidget):
             return
         
         try:
-            self._updating_account = True
-            
             # 切换激活账号
             self.account_repo.set_active_account(account_id)
             
-            # 刷新车库视图
-            self.refresh()
-            
-            # 发出信号通知主窗口
+            # 发出信号通知主窗口（会触发 refresh_all，包含 load_accounts 和 refresh）
             self.account_changed.emit(account_id)
-            
-            # 更新下拉框显示（添加✓标记）
-            self.load_accounts()
             
         except Exception as e:
             logger.error(f"切换账号失败: {str(e)}", exc_info=True)
             QMessageBox.critical(self, "错误", f"切换账号失败：{str(e)}")
-        finally:
-            self._updating_account = False
 
 
 class AddVehicleDialog(QDialog):

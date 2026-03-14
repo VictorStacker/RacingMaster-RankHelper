@@ -18,7 +18,7 @@ def build():
         '--name=RacingMaster-RankHelper',  # 可执行文件名
         '--windowed',  # 不显示控制台窗口
         '--onefile',  # 打包成单个文件
-        '--icon=NONE',  # 如果有图标文件可以指定
+        '--icon=icon.ico',  # 应用图标
         '--add-data=rm_rank;rm_rank',  # 包含 rm_rank 包
         '--hidden-import=rm_rank',
         '--hidden-import=rm_rank.ui',
