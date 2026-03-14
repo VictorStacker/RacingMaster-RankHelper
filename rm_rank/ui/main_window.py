@@ -76,6 +76,16 @@ class MainWindow(QMainWindow):
         self.init_ui()
         self.update_account_status()
         
+        # 设置窗口图标
+        import os
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        icon_path = os.path.join(base_path, 'icon.ico')
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+        
     def init_ui(self):
         """初始化用户界面"""
         self.setWindowTitle("巅峰极速车辆数据及排位计分车推荐")
@@ -535,7 +545,19 @@ class MainWindow(QMainWindow):
 
 def run_gui():
     """运行图形界面"""
+    import os
     app = QApplication(sys.argv)
+    
+    # 设置应用图标（兼容打包后的路径）
+    if getattr(sys, 'frozen', False):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    
+    icon_path = os.path.join(base_path, 'icon.ico')
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
+    
     window = MainWindow()
     window.show()
     sys.exit(app.exec())

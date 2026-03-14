@@ -258,8 +258,30 @@ def main():
             # 启动图形界面
             from rm_rank.ui import MainWindow
             from PyQt6.QtWidgets import QApplication
+            from PyQt6.QtGui import QIcon
+            import os
+            import ctypes
+            
+            # 设置 Windows 任务栏图标（AppUserModelID）
+            try:
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+                    'RacingMaster.RankHelper.1.3'
+                )
+            except Exception:
+                pass
             
             app = QApplication(sys.argv)
+            
+            # 设置应用程序图标（影响任务栏图标）
+            if getattr(sys, 'frozen', False):
+                base_path = sys._MEIPASS
+            else:
+                base_path = os.path.dirname(os.path.abspath(__file__))
+                base_path = os.path.dirname(base_path)
+            icon_path = os.path.join(base_path, 'icon.ico')
+            if os.path.exists(icon_path):
+                app.setWindowIcon(QIcon(icon_path))
+            
             window = MainWindow()
             window.show()
             sys.exit(app.exec())
