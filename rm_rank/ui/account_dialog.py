@@ -54,6 +54,14 @@ class AccountManagementDialog(QDialog):
         delete_button.clicked.connect(self.delete_account)
         button_layout.addWidget(delete_button)
         
+        move_up_button = QPushButton("↑ 上移")
+        move_up_button.clicked.connect(self.move_account_up)
+        button_layout.addWidget(move_up_button)
+        
+        move_down_button = QPushButton("↓ 下移")
+        move_down_button.clicked.connect(self.move_account_down)
+        button_layout.addWidget(move_down_button)
+        
         button_layout.addStretch()
         
         switch_button = QPushButton("切换到此账号")
@@ -296,3 +304,37 @@ class AccountManagementDialog(QDialog):
         except Exception as e:
             logger.error(f"切换账号失败: {str(e)}", exc_info=True)
             QMessageBox.critical(self, "错误", f"切换账号失败：{str(e)}")
+    
+    def move_account_up(self):
+        """将选中账号上移"""
+        self._move_account(-1)
+    
+    def move_account_down(self):
+        """将选中账号下移"""
+        self._move_account(1)
+    
+    def _move_account(self, direction: int):
+        """移动账号顺序"""
+        selected_rows = self.table.selectionModel().selectedRows()
+        
+        if not selected_rows:
+            QMessageBox.warning(self, "警告", "请先选择要移动的账号")
+            return
+        
+        row = selected_rows[0].row()
+        account_id = int(self.table.item(row, 0).text())
+        
+        try:
+            self.account_repo.move_account(account_id, direction)
+            self.load_accounts()
+            self.accounts_updated.emit()
+            
+            # 移动后保持选中同一个账号
+            for r in range(self.table.rowCount()):
+                if int(self.table.item(r, 0).text()) == account_id:
+                    self.table.selectRow(r)
+                    break
+                    
+        except Exception as e:
+            logger.error(f"移动账号失败: {str(e)}", exc_info=True)
+            QMessageBox.critical(self, "错误", f"移动账号失败：{str(e)}")

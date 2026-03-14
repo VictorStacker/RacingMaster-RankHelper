@@ -207,17 +207,17 @@ class RecommendationView(QWidget):
         
         # 根据参数设置列数和标题
         if include_category and not include_tuning:
-            # 全部推荐：排名、车型、组别、阶数、圈速总和
+            # 全部推荐：推荐序、车型、组别、阶数、圈速总和
             table.setColumnCount(5)
-            table.setHorizontalHeaderLabels(["排名", "车型", "组别", "阶数", "圈速总和(秒)"])
+            table.setHorizontalHeaderLabels(["推荐序", "车型", "组别", "阶数", "圈速总和(秒)"])
         elif not include_category and include_tuning:
-            # 分组标签页：排名、车型、阶数、圈速、调教推荐
+            # 分组标签页：推荐序、车型、阶数、圈速、调教推荐
             table.setColumnCount(5)
-            table.setHorizontalHeaderLabels(["排名", "车型", "阶数", "圈速(秒)", "调教推荐"])
+            table.setHorizontalHeaderLabels(["推荐序", "车型", "阶数", "圈速(秒)", "调教推荐"])
         else:
-            # 默认：排名、车型、组别、阶数、圈速总和
+            # 默认：推荐序、车型、组别、阶数、圈速总和
             table.setColumnCount(5)
-            table.setHorizontalHeaderLabels(["排名", "车型", "组别", "阶数", "圈速总和(秒)"])
+            table.setHorizontalHeaderLabels(["推荐序", "车型", "组别", "阶数", "圈速总和(秒)"])
         
         # 设置表格属性
         table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)

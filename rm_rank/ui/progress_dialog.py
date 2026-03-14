@@ -10,9 +10,8 @@ from PyQt6.QtWidgets import (
     QLabel,
     QProgressBar,
     QPushButton,
-    QTextEdit,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QThread
+from PyQt6.QtCore import Qt, pyqtSignal, QThread, QTimer
 from typing import Optional, Callable
 
 from rm_rank.logger import get_logger
@@ -66,7 +65,7 @@ class CrawlerThread(QThread):
             if success:
                 self.progress_updated.emit(80, "正在保存数据...")
                 self.progress_updated.emit(100, "完成")
-                self.finished_signal.emit(True, f"成功获取 {len(data)} 条数据")
+                self.finished_signal.emit(True, "数据库更新完成")
             else:
                 self.error_occurred.emit(message)
                 self.finished_signal.emit(False, message)
@@ -96,16 +95,22 @@ class ProgressDialog(QDialog):
         super().__init__(parent)
         self.crawler_func = crawler_func
         self.crawler_thread: Optional[CrawlerThread] = None
+        self._countdown = 5
+        self._countdown_timer = QTimer(self)
+        self._countdown_timer.timeout.connect(self._on_countdown)
         self._init_ui()
 
     def _init_ui(self):
         """初始化用户界面"""
-        self.setWindowTitle("数据更新进度")
+        self.setWindowTitle("数据更新")
         self.setModal(True)
-        self.setMinimumWidth(500)
-        self.setMinimumHeight(300)
+        self.setFixedSize(380, 120)
+        # 隐藏标题栏的关闭/最小化/最大化按钮
+        self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.CustomizeWindowHint | Qt.WindowType.WindowTitleHint)
 
         layout = QVBoxLayout()
+        layout.setContentsMargins(20, 20, 20, 16)
+        layout.setSpacing(12)
 
         # 状态标签
         self.status_label = QLabel("准备开始...")
@@ -117,12 +122,6 @@ class ProgressDialog(QDialog):
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         layout.addWidget(self.progress_bar)
-
-        # 详细信息文本框
-        self.detail_text = QTextEdit()
-        self.detail_text.setReadOnly(True)
-        self.detail_text.setMaximumHeight(150)
-        layout.addWidget(self.detail_text)
 
         # 取消按钮
         self.cancel_button = QPushButton("取消")
@@ -160,50 +159,44 @@ class ProgressDialog(QDialog):
         self._add_detail(f"[{value}%] {message}")
 
     def _on_finished(self, success: bool, message: str):
-        """
-        处理获取完成
-
-        Args:
-            success: 是否成功
-            message: 结果消息
-        """
-        self.cancel_button.setText("关闭")
-        self.cancel_button.setEnabled(True)
-
+        """处理获取完成"""
+        self.progress_bar.setValue(100 if success else self.progress_bar.value())
+        
         if success:
             self.status_label.setText("✓ " + message)
-            self._add_detail(f"成功: {message}")
+            self.status_label.setStyleSheet("color: #2e7d32; font-weight: bold;")
         else:
             self.status_label.setText("✗ " + message)
-            self._add_detail(f"失败: {message}")
+            self.status_label.setStyleSheet("color: #c62828; font-weight: bold;")
+        
+        # 切换为确定按钮，开始 5 秒倒计时
+        self._countdown = 5
+        self.cancel_button.setText(f"确定（{self._countdown}秒后自动关闭）")
+        self.cancel_button.setEnabled(True)
+        self._countdown_timer.start(1000)
+    
+    def _on_countdown(self):
+        """倒计时每秒触发"""
+        self._countdown -= 1
+        if self._countdown <= 0:
+            self._countdown_timer.stop()
+            self.accept()
+        else:
+            self.cancel_button.setText(f"确定（{self._countdown}秒后自动关闭）")
 
     def _on_error(self, error_message: str):
-        """
-        处理错误
-
-        Args:
-            error_message: 错误消息
-        """
-        self._add_detail(f"错误: {error_message}")
+        """处理错误"""
+        self.status_label.setText("✗ " + error_message)
 
     def _on_cancel(self):
-        """处理取消按钮点击"""
+        """处理取消/确定按钮点击"""
+        self._countdown_timer.stop()
         if self.crawler_thread and self.crawler_thread.isRunning():
-            self._add_detail("正在取消...")
             self.cancel_button.setEnabled(False)
             self.crawler_thread.cancel()
             self.crawler_thread.wait()
-            self._add_detail("已取消")
         self.accept()
 
     def _add_detail(self, message: str):
-        """
-        添加详细信息
-
-        Args:
-            message: 消息内容
-        """
-        self.detail_text.append(message)
-        # 滚动到底部
-        scrollbar = self.detail_text.verticalScrollBar()
-        scrollbar.setValue(scrollbar.maximum())
+        """保留兼容性，不再显示详细日志"""
+        pass

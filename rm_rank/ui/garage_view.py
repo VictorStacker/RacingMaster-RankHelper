@@ -209,11 +209,16 @@ class GarageView(QWidget):
             table.setItem(row, 4, tier_item)
             table.setItem(row, 5, lap_time_item)
             
-            # 添加"调整"按钮
+            # 添加"调整"按钮（居中）
             adjust_button = QPushButton("调整")
             adjust_button.setMaximumWidth(70)
             adjust_button.clicked.connect(lambda checked, name=v.name, tier=v.tier: self.adjust_tier(name, tier))
-            table.setCellWidget(row, 6, adjust_button)
+            container = QWidget()
+            container_layout = QHBoxLayout(container)
+            container_layout.addWidget(adjust_button)
+            container_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            container_layout.setContentsMargins(0, 0, 0, 0)
+            table.setCellWidget(row, 6, container)
             
     def add_vehicle(self):
         """添加车辆对话框（支持连续添加）"""

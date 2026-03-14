@@ -27,6 +27,7 @@ class Account(Base):
     name = Column(String, nullable=False, unique=True)
     description = Column(String, nullable=True)
     is_active = Column(Boolean, default=False)  # 当前激活的账号
+    sort_order = Column(Integer, default=0)  # 排列顺序
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -101,13 +102,18 @@ class CurrentCombination(Base):
 
 
 def init_database(database_url: str = DATABASE_URL) -> None:
-    """初始化数据库，创建所有表
-    
-    Args:
-        database_url: 数据库连接URL
-    """
+    """初始化数据库，创建所有表"""
     engine = create_engine(database_url)
     Base.metadata.create_all(engine)
+    
+    # 迁移：若 accounts 表缺少 sort_order 列则补上
+    with engine.connect() as conn:
+        from sqlalchemy import text, inspect
+        inspector = inspect(engine)
+        cols = [c['name'] for c in inspector.get_columns('accounts')]
+        if 'sort_order' not in cols:
+            conn.execute(text("ALTER TABLE accounts ADD COLUMN sort_order INTEGER DEFAULT 0"))
+            conn.commit()
 
 
 def get_session_maker(database_url: str = DATABASE_URL) -> sessionmaker:

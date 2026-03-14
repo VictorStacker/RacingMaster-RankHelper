@@ -43,8 +43,9 @@ class AccountRepository:
             if existing:
                 raise BusinessLogicError(f"账号名称已存在: {name}")
             
-            # 创建账号
-            account = Account(name=name, description=description)
+            # 创建账号，sort_order 排在最后
+            max_order = self.session.query(Account).count()
+            account = Account(name=name, description=description, sort_order=max_order)
             self.session.add(account)
             self.session.commit()
             
@@ -59,13 +60,9 @@ class AccountRepository:
             raise DatabaseError(f"创建账号失败: {str(e)}")
     
     def get_all_accounts(self) -> List[Account]:
-        """获取所有账号
-        
-        Returns:
-            账号列表
-        """
+        """获取所有账号（按 sort_order 排序）"""
         try:
-            return self.session.query(Account).order_by(Account.created_at).all()
+            return self.session.query(Account).order_by(Account.sort_order, Account.created_at).all()
         except SQLAlchemyError as e:
             logger.error(f"获取账号列表失败: {str(e)}")
             raise DatabaseError(f"获取账号列表失败: {str(e)}")
@@ -182,15 +179,7 @@ class AccountRepository:
             raise DatabaseError(f"更新账号失败: {str(e)}")
     
     def delete_account(self, account_id: int) -> None:
-        """删除账号
-        
-        Args:
-            account_id: 账号ID
-            
-        Raises:
-            BusinessLogicError: 账号不存在
-            DatabaseError: 数据库操作失败
-        """
+        """删除账号"""
         try:
             account = self.get_account_by_id(account_id)
             if not account:
@@ -200,6 +189,8 @@ class AccountRepository:
             self.session.delete(account)
             self.session.commit()
             
+            # 删除后重新整理 sort_order
+            self._normalize_sort_order()
             logger.info(f"删除账号: {account_name}")
             
         except BusinessLogicError:
@@ -208,6 +199,53 @@ class AccountRepository:
             self.session.rollback()
             logger.error(f"删除账号失败: {str(e)}", exc_info=True)
             raise DatabaseError(f"删除账号失败: {str(e)}")
+    
+    def move_account(self, account_id: int, direction: int) -> None:
+        """移动账号顺序
+        
+        Args:
+            account_id: 账号ID
+            direction: -1 上移，1 下移
+        """
+        try:
+            # 先 normalize 确保 sort_order 连续
+            self._normalize_sort_order()
+            
+            accounts = self.get_all_accounts()
+            ids = [a.id for a in accounts]
+            
+            if account_id not in ids:
+                raise BusinessLogicError(f"账号不存在: ID={account_id}")
+            
+            idx = ids.index(account_id)
+            new_idx = idx + direction
+            
+            if new_idx < 0 or new_idx >= len(ids):
+                return  # 已在边界，不动
+            
+            # 交换 sort_order
+            a1 = accounts[idx]
+            a2 = accounts[new_idx]
+            a1.sort_order, a2.sort_order = a2.sort_order, a1.sort_order
+            self.session.commit()
+            
+        except BusinessLogicError:
+            raise
+        except SQLAlchemyError as e:
+            self.session.rollback()
+            logger.error(f"移动账号失败: {str(e)}", exc_info=True)
+            raise DatabaseError(f"移动账号失败: {str(e)}")
+    
+    def _normalize_sort_order(self) -> None:
+        """重新整理 sort_order，确保连续"""
+        try:
+            accounts = self.session.query(Account).order_by(Account.sort_order, Account.created_at).all()
+            for i, account in enumerate(accounts):
+                account.sort_order = i
+            self.session.commit()
+        except SQLAlchemyError as e:
+            self.session.rollback()
+            logger.error(f"整理排序失败: {str(e)}", exc_info=True)
     
     def ensure_default_account(self) -> Account:
         """确保存在默认账号，如果不存在则创建

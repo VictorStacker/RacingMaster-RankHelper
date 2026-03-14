@@ -262,7 +262,7 @@ class MainWindow(QMainWindow):
         
         # 刷新所有视图
         self.refresh_all()
-        self.statusBar().showMessage("数据更新完成", 3000)
+        self.update_account_status()
     
     def reset_tuning_database(self):
         """重置车辆数据库"""
@@ -326,16 +326,23 @@ class MainWindow(QMainWindow):
         self.garage_view.load_accounts()
         self.garage_view.refresh()
         self.recommendation_view.refresh()
-        self.statusBar().showMessage("已刷新", 3000)
+        self.update_account_status()
         
     def show_about(self):
         """显示关于对话框"""
+        from rm_rank import __version__
         QMessageBox.about(
             self,
             "关于",
-            "<h3>巅峰极速车辆数据及排位计分车推荐</h3>"
-            "<p>版本: 1.3</p>"
-            "<p>一个数据驱动的决策支持工具，帮助玩家优化排位赛车辆选择。</p>"
+            f"<h3>巅峰极速车辆数据及排位计分车推荐</h3>"
+            f"<p>版本：{__version__}</p>"
+            f"<p>一个数据驱动的决策支持工具，帮助玩家在排位赛中选择最优车辆组合。</p>"
+            f"<hr>"
+            f"<p>数据来源：<a href='https://waylongrank.top/index.html'>阿龙WayLong</a></p>"
+            f"<p>开源地址：<a href='https://github.com/VictorStacker/RacingMaster-RankHelper'>GitHub</a></p>"
+            f"<p>By 隨緣</p>"
+            f"<hr>"
+            f"<p style='color: #888; font-size: 11px;'>本工具为非官方第三方工具，与《巅峰极速》官方无关。<br>仅供参考，实际表现与驾驶技术有直接关系。</p>"
         )
     
     def import_vehicles(self):
