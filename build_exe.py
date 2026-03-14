@@ -19,6 +19,7 @@ def build():
         '--windowed',  # 不显示控制台窗口
         '--onefile',  # 打包成单个文件
         '--icon=icon.ico',  # 应用图标
+        '--add-data=icon.ico;.',  # 将图标文件打包进去（运行时加载用）
         '--add-data=rm_rank;rm_rank',  # 包含 rm_rank 包
         '--hidden-import=rm_rank',
         '--hidden-import=rm_rank.ui',
