@@ -217,17 +217,44 @@ class GarageRepository:
             DatabaseError: 数据库操作失败
         """
         try:
-            # 移除旧车辆
-            self.remove_vehicle(name, old_tier)
-            
-            # 添加新车辆
-            self.add_vehicle(name, new_tier)
-            
             account_id = self._get_account_id()
+            
+            # 查找旧车辆
+            old_vehicle = self.session.query(Vehicle).filter(
+                Vehicle.name == name,
+                Vehicle.tier == old_tier
+            ).first()
+            if not old_vehicle:
+                raise BusinessLogicError(f"车辆不存在: {name} {old_tier}阶")
+            
+            # 查找新阶数车辆
+            new_vehicle = self.session.query(Vehicle).filter(
+                Vehicle.name == name,
+                Vehicle.tier == new_tier
+            ).first()
+            if not new_vehicle:
+                raise BusinessLogicError(f"车辆不存在: {name} {new_tier}阶")
+            
+            # 找到车库记录
+            garage_entry = self.session.query(UserGarage).filter(
+                UserGarage.account_id == account_id,
+                UserGarage.vehicle_id == old_vehicle.id
+            ).first()
+            if not garage_entry:
+                raise BusinessLogicError(f"车辆不在车库中: {name} {old_tier}阶")
+            
+            # 直接更新 vehicle_id，避免先删后加导致的重复检查问题
+            garage_entry.vehicle_id = new_vehicle.id
+            self.session.commit()
+            
             logger.info(f"更新车辆阶数 (账号ID={account_id}): {name} {old_tier}阶 -> {new_tier}阶")
             
-        except (BusinessLogicError, DatabaseError):
+        except BusinessLogicError:
             raise
+        except SQLAlchemyError as e:
+            self.session.rollback()
+            logger.error(f"更新车辆阶数失败: {str(e)}", exc_info=True)
+            raise DatabaseError(f"更新车辆阶数失败: {str(e)}")
     
     @staticmethod
     def _to_vehicle_config(vehicle: Vehicle) -> VehicleConfig:

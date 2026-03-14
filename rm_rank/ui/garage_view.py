@@ -682,7 +682,7 @@ class UpgradeTierDialog(QDialog):
         
     def init_ui(self):
         """初始化用户界面"""
-        self.setWindowTitle("车辆升阶")
+        self.setWindowTitle("调整阶数")
         self.setModal(True)
         self.resize(300, 150)
         
@@ -718,7 +718,7 @@ class UpgradeTierDialog(QDialog):
         new_tier = self.tier_spin.value()
         
         if new_tier == self.current_tier:
-            QMessageBox.information(self, "提示", "新阶数与当前阶数相同，无需升阶")
+            QMessageBox.information(self, "提示", "新阶数与当前阶数相同，无需调整")
             return
         
         self.new_tier = new_tier
