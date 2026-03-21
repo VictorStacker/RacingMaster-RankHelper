@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('rm_rank', 'rm_rank')]
+datas = [('icon.ico', '.'), ('rm_rank', 'rm_rank')]
 binaries = []
 hiddenimports = ['rm_rank', 'rm_rank.ui', 'rm_rank.models', 'rm_rank.engines', 'rm_rank.repositories', 'rm_rank.crawler', 'rm_rank.io', 'PyQt6', 'playwright', 'sqlalchemy', 'pydantic']
 tmp_ret = collect_all('PyQt6')
