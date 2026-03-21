@@ -102,7 +102,7 @@ class DataExporter:
                 accounts_data.append({
                     "name": account.name,
                     "description": account.description or "",
-                    "garage": [self._vehicle_to_dict(v) for v in garage_vehicles]
+                    "garage": [self._vehicle_to_dict(v, include_resting=True) for v in garage_vehicles]
                 })
                 
                 total_vehicles += len(garage_vehicles)
@@ -259,7 +259,7 @@ class DataExporter:
                 accounts_data.append({
                     "name": account.name,
                     "description": account.description or "",
-                    "garage": [self._vehicle_to_dict(v) for v in garage_vehicles],
+                    "garage": [self._vehicle_to_dict(v, include_resting=True) for v in garage_vehicles],
                     "combination": [self._vehicle_to_dict(v) for v in combination_vehicles]
                 })
             
@@ -284,7 +284,7 @@ class DataExporter:
             raise IOError(f"写入文件失败: {e}")
 
     @staticmethod
-    def _vehicle_to_dict(vehicle: VehicleConfig) -> Dict[str, Any]:
+    def _vehicle_to_dict(vehicle: VehicleConfig, include_resting: bool = False) -> Dict[str, Any]:
         """
         将车辆配置转换为字典
 
@@ -294,9 +294,12 @@ class DataExporter:
         Returns:
             车辆数据字典
         """
-        return {
+        data = {
             "name": vehicle.name,
             "category": vehicle.category,
             "tier": vehicle.tier,
             "lap_time": vehicle.lap_time,
         }
+        if include_resting:
+            data["is_resting"] = getattr(vehicle, "is_resting", False)
+        return data

@@ -15,7 +15,7 @@ def build():
     # PyInstaller 参数
     args = [
         'run_gui.py',  # 入口文件
-        '--name=RacingMaster-RankHelper-v1.4',  # 可执行文件名
+        '--name=RacingMaster-RankHelper-v1.5',  # 可执行文件名
         '--windowed',  # 不显示控制台窗口
         '--onefile',  # 打包成单个文件
         '--icon=icon.ico',  # 应用图标
@@ -34,6 +34,9 @@ def build():
         '--hidden-import=pydantic',
         '--collect-all=PyQt6',
         '--collect-all=playwright',
+        '--exclude-module=django',
+        '--exclude-module=pytest',
+        '--exclude-module=hypothesis',
         '--noconfirm',  # 覆盖已存在的文件
     ]
     
@@ -42,10 +45,10 @@ def build():
     
     try:
         PyInstaller.__main__.run(args)
-        print("\n✓ 打包完成！")
-        print(f"可执行文件位置: dist/RacingMaster-RankHelper-v1.4.exe")
+        print("\n[OK] 打包完成")
+        print("可执行文件位置: dist/RacingMaster-RankHelper-v1.5.exe")
     except Exception as e:
-        print(f"\n✗ 打包失败: {e}")
+        print(f"\n[ERROR] 打包失败: {e}")
         sys.exit(1)
 
 if __name__ == '__main__':

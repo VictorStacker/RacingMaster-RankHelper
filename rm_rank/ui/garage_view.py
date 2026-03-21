@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox, QMessageBox, QHeaderView, QTabWidget, QLabel, QCompleter
 )
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QColor
 
 from rm_rank.repositories import GarageRepository, VehicleRepository, AccountRepository
 from rm_rank.exceptions import BusinessLogicError
@@ -90,7 +91,9 @@ class GarageView(QWidget):
         layout.addWidget(self.tabs)
         
         # 说明文字（标签页下方）
-        note_label = QLabel("💡 圈速总和 (数值越小越快) - 此表仅作大致参考，具体情况与技术有直接关系")
+        note_label = QLabel(
+            "💡 圈速总和 (数值越小越快) - 已标记“已跑够”的车辆会置后并以灰色弱化显示"
+        )
         note_label.setStyleSheet(
             "color: #555; font-size: 12px; padding: 8px 15px; "
             "background-color: #fffbea; border-left: 3px solid #f59e0b; "
@@ -104,8 +107,8 @@ class GarageView(QWidget):
     def create_table(self):
         """创建表格"""
         table = QTableWidget()
-        table.setColumnCount(7)  # 增加一列用于操作按钮
-        table.setHorizontalHeaderLabels(["", "总榜", "车型", "组别", "阶数", "圈速(秒)", "操作"])
+        table.setColumnCount(8)
+        table.setHorizontalHeaderLabels(["", "总榜", "车型", "组别", "阶数", "圈速(秒)", "状态", "操作"])
         
         # 设置表格属性
         table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -119,14 +122,16 @@ class GarageView(QWidget):
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)  # 组别列固定
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)  # 阶数列固定
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)  # 圈速列固定
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)  # 操作列固定
-        
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)  # 状态列固定
+        header.setSectionResizeMode(7, QHeaderView.ResizeMode.Fixed)  # 操作列固定
+
         table.setColumnWidth(0, 30)   # 勾选框列
         table.setColumnWidth(1, 50)   # ID列
         table.setColumnWidth(3, 80)   # 组别列
         table.setColumnWidth(4, 60)   # 阶数列
         table.setColumnWidth(5, 120)  # 圈速列
-        table.setColumnWidth(6, 80)   # 操作列
+        table.setColumnWidth(6, 80)   # 状态列
+        table.setColumnWidth(7, 170)  # 操作列
         
         # 隐藏勾选框列（默认不显示）
         table.setColumnHidden(0, True)
@@ -139,7 +144,7 @@ class GarageView(QWidget):
             vehicles = self.garage_repo.get_all_garage_vehicles()
             
             # 按圈速排序（从小到大）
-            vehicles.sort(key=lambda v: v.lap_time)
+            vehicles.sort(key=lambda v: (v.is_resting, v.lap_time))
             
             # 建立总榜排名映射 {vehicle_id: rank}
             rank_map = {}
@@ -202,23 +207,50 @@ class GarageView(QWidget):
             
             lap_time_item = QTableWidgetItem(f"{v.lap_time:.1f} s")
             lap_time_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            
+
+            status_item = QTableWidgetItem("已跑够" if v.is_resting else "正常")
+            status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+
             table.setItem(row, 1, rank_item)
             table.setItem(row, 2, name_item)
             table.setItem(row, 3, category_item)
             table.setItem(row, 4, tier_item)
             table.setItem(row, 5, lap_time_item)
-            
-            # 添加"调整"按钮（居中）
+            table.setItem(row, 6, status_item)
+
+            if v.is_resting:
+                self._apply_resting_row_style(
+                    checkbox,
+                    rank_item,
+                    name_item,
+                    category_item,
+                    tier_item,
+                    lap_time_item,
+                    status_item,
+                )
+
+            # 添加操作按钮（居中）
             adjust_button = QPushButton("调整")
             adjust_button.setMaximumWidth(70)
             adjust_button.clicked.connect(lambda checked, name=v.name, tier=v.tier: self.adjust_tier(name, tier))
+
+            resting_button = QPushButton("取消休息" if v.is_resting else "标记休息")
+            resting_button.setMaximumWidth(80)
+            resting_button.clicked.connect(
+                lambda checked, name=v.name, tier=v.tier, resting=not v.is_resting: self.set_vehicle_resting_status(
+                    name,
+                    tier,
+                    resting,
+                )
+            )
+
             container = QWidget()
             container_layout = QHBoxLayout(container)
             container_layout.addWidget(adjust_button)
+            container_layout.addWidget(resting_button)
             container_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
             container_layout.setContentsMargins(0, 0, 0, 0)
-            table.setCellWidget(row, 6, container)
+            table.setCellWidget(row, 7, container)
             
     def add_vehicle(self):
         """添加车辆对话框（支持连续添加）"""
@@ -282,6 +314,16 @@ class GarageView(QWidget):
                     QMessageBox.warning(self, "警告", str(e))
                 except Exception as e:
                     QMessageBox.critical(self, "错误", f"调整阶数失败：{str(e)}")
+
+    def set_vehicle_resting_status(self, name: str, tier: int, is_resting: bool):
+        """设置车辆休息状态"""
+        try:
+            self.garage_repo.set_vehicle_resting_status(name, tier, is_resting)
+            self.refresh()
+        except BusinessLogicError as e:
+            QMessageBox.warning(self, "警告", str(e))
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"更新车辆状态失败：{str(e)}")
     
 
     def toggle_delete_mode(self):
@@ -382,8 +424,8 @@ class GarageView(QWidget):
         if reply == QMessageBox.StandardButton.Yes:
             for index in selected_rows:
                 row = index.row()
-                name_item = current_table.item(row, 1)
-                tier_item = current_table.item(row, 3)
+                name_item = current_table.item(row, 2)
+                tier_item = current_table.item(row, 4)
                 if name_item and tier_item:
                     name = name_item.text()
                     tier = int(tier_item.text())
@@ -394,6 +436,15 @@ class GarageView(QWidget):
                         
             self.refresh()
             QMessageBox.information(self, "成功", "已删除选中的车辆")
+
+    @staticmethod
+    def _apply_resting_row_style(*items):
+        """弱化显示已跑够车辆"""
+        foreground = QColor(120, 120, 120)
+        background = QColor(242, 242, 242)
+        for item in items:
+            item.setForeground(foreground)
+            item.setBackground(background)
     
     def load_accounts(self):
         """加载账号列表到下拉框"""

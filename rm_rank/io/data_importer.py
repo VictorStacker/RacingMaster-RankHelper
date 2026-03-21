@@ -185,16 +185,19 @@ class DataImporter:
 
         for item in garage_data:
             try:
+                is_resting = item.get("is_resting", False)
                 # 检查车辆是否存在于数据库
                 if self.vehicle_repo.vehicle_exists(
                     item["name"], item["category"], item["tier"]
                 ):
                     # 检查是否已在车库中
-                    if not self.garage_repo.vehicle_exists(
-                        item["name"], item["tier"]
-                    ):
+                    exists_in_garage = self.garage_repo.vehicle_exists(item["name"], item["tier"])
+                    if not exists_in_garage:
                         self.garage_repo.add_vehicle(item["name"], item["tier"])
                         added += 1
+                    self.garage_repo.set_vehicle_resting_status(
+                        item["name"], item["tier"], is_resting
+                    )
                 else:
                     logger.warning(
                         f"跳过不存在的车辆: {item['name']} {item['tier']}阶"
@@ -252,16 +255,19 @@ class DataImporter:
             added = 0
             for item in garage_data:
                 try:
+                    is_resting = item.get("is_resting", False)
                     # 检查车辆是否存在于数据库
                     if self.vehicle_repo.vehicle_exists(
                         item["name"], item["category"], item["tier"]
                     ):
                         # 检查是否已在车库中
-                        if not self.garage_repo.vehicle_exists(
-                            item["name"], item["tier"]
-                        ):
+                        exists_in_garage = self.garage_repo.vehicle_exists(item["name"], item["tier"])
+                        if not exists_in_garage:
                             self.garage_repo.add_vehicle(item["name"], item["tier"])
                             added += 1
+                        self.garage_repo.set_vehicle_resting_status(
+                            item["name"], item["tier"], is_resting
+                        )
                     else:
                         logger.warning(
                             f"跳过不存在的车辆: {item['name']} {item['tier']}阶"
@@ -488,14 +494,17 @@ class DataImporter:
                 garage_added = 0
                 for item in garage_data:
                     try:
+                        is_resting = item.get("is_resting", False)
                         if self.vehicle_repo.vehicle_exists(
                             item["name"], item["category"], item["tier"]
                         ):
-                            if not self.garage_repo.vehicle_exists(
-                                item["name"], item["tier"]
-                            ):
+                            exists_in_garage = self.garage_repo.vehicle_exists(item["name"], item["tier"])
+                            if not exists_in_garage:
                                 self.garage_repo.add_vehicle(item["name"], item["tier"])
                                 garage_added += 1
+                            self.garage_repo.set_vehicle_resting_status(
+                                item["name"], item["tier"], is_resting
+                            )
                         else:
                             logger.warning(
                                 f"跳过不存在的车辆: {item['name']} {item['tier']}阶"

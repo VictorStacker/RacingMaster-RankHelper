@@ -41,6 +41,11 @@ class VehicleConfig(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class GarageVehicleConfig(VehicleConfig):
+    """车库中的车辆配置，包含账号级状态"""
+    is_resting: bool = False
+
+
 class RankedVehicle(BaseModel):
     """带排名的车辆配置"""
     vehicle: VehicleConfig

@@ -22,7 +22,7 @@ pyinstaller --name=RacingMaster-RankHelper --windowed --onefile run_gui.py
 
 ### 3. 查找生成的文件
 
-可执行文件位于: `dist/RacingMaster-RankHelper.exe`
+可执行文件位于: `dist/RacingMaster-RankHelper-v1.5.exe`
 
 ## 方法 2: 使用 cx_Freeze
 

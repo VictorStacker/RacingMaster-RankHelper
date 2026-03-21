@@ -48,6 +48,37 @@ SCORING_COLORS = [
 assert len(SCORING_COLORS) == 3, "SCORING_COLORS 必须包含3种颜色"
 
 
+def build_display_rows(ranked_vehicles):
+    """生成推荐页显示顺序。
+
+    规则：
+    - 推荐序保持原始结果中的 rank
+    - 组内排名颜色按原始结果中的组内位置计算
+    - 已标记休息的车辆仅在显示时稳定下沉到列表底部
+    """
+    category_counters = {
+        "极限组": 0,
+        "性能组": 0,
+        "运动组": 0,
+    }
+    rows = []
+
+    for ranked_vehicle in ranked_vehicles:
+        category_name = ranked_vehicle.vehicle.category.value
+        category_counters[category_name] += 1
+        rows.append(
+            {
+                "ranked_vehicle": ranked_vehicle,
+                "category_rank": category_counters[category_name],
+                "is_resting": getattr(ranked_vehicle.vehicle, "is_resting", False),
+            }
+        )
+
+    active_rows = [row for row in rows if not row["is_resting"]]
+    resting_rows = [row for row in rows if row["is_resting"]]
+    return active_rows + resting_rows
+
+
 def get_scoring_color(category_name: str, category_rank: int) -> QColor:
     """根据组别和组别内排名获取背景色
     
@@ -150,7 +181,7 @@ class RecommendationView(QWidget):
         
         # 说明文字
         note_label = QLabel(
-            "圈速总和 (数值越小越快) - 此表仅作大致参考，具体情况与技术有直接关系"
+            "圈速总和 (数值越小越快) - 已跑够车辆会在推荐页置底显示，但保留原始推荐序"
         )
         note_label.setStyleSheet(
             "color: #666; font-size: 12px; padding: 5px 10px; "
@@ -331,12 +362,18 @@ class RecommendationView(QWidget):
             
             # 更新统计信息
             garage_count = len(garage_vehicles)
+            resting_selected_count = sum(
+                1
+                for ranked_vehicle in all_result.vehicles
+                if getattr(ranked_vehicle.vehicle, "is_resting", False)
+            )
             self.stats_label.setText(
                 f"车库共有 {garage_count} 辆车 | "
                 f"全部推荐: {all_result.count}辆 ({all_result.total_lap_time:.1f} s) | "
                 f"运动组: {sports_result.count}辆 ({sports_result.total_lap_time:.1f} s) | "
                 f"性能组: {performance_result.count}辆 ({performance_result.total_lap_time:.1f} s) | "
-                f"极限组: {extreme_result.count}辆 ({extreme_result.total_lap_time:.1f} s)"
+                f"极限组: {extreme_result.count}辆 ({extreme_result.total_lap_time:.1f} s) | "
+                f"已标记休息: {resting_selected_count}辆"
             )
             
             # 更新各个表格
@@ -367,24 +404,16 @@ class RecommendationView(QWidget):
         # 清空表格
         table.setRowCount(0)
         
-        # 初始化组别内排名计数器
-        category_counters = {
-            "极限组": 0,
-            "性能组": 0,
-            "运动组": 0,
-        }
-        
         # 填充推荐数据
-        for ranked_vehicle in result.vehicles:
+        for display_row in build_display_rows(result.vehicles):
             row = table.rowCount()
             table.insertRow(row)
             
+            ranked_vehicle = display_row["ranked_vehicle"]
             v = ranked_vehicle.vehicle
             category_name = v.category.value
-            
-            # 更新该组别的计数器
-            category_counters[category_name] += 1
-            category_rank = category_counters[category_name]
+            is_resting = getattr(v, "is_resting", False)
+            category_rank = display_row["category_rank"]
             
             # 根据组别内排名确定背景色
             color = get_scoring_color(category_name, category_rank)
@@ -400,7 +429,8 @@ class RecommendationView(QWidget):
             col += 1
             
             # 车型列
-            name_item = QTableWidgetItem(v.name)
+            name_text = f"{v.name}（已跑够）" if is_resting else v.name
+            name_item = QTableWidgetItem(name_text)
             name_item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             name_item.setBackground(color)
             table.setItem(row, col, name_item)
@@ -439,6 +469,9 @@ class RecommendationView(QWidget):
                 # 自动调整行高以适应调教数据
                 if "\n" in tuning_text:
                     table.resizeRowToContents(row)
+
+            if is_resting:
+                self._apply_resting_row_style(table, row)
     
     def _get_tuning_recommendation(self, vehicle_name: str, vehicle_tier: int) -> str:
         """获取调教推荐
@@ -458,3 +491,12 @@ class RecommendationView(QWidget):
         except Exception as e:
             logger.error(f"获取调教推荐失败: {str(e)}", exc_info=True)
             return "加载失败"
+
+    @staticmethod
+    def _apply_resting_row_style(table, row: int):
+        """弱化显示已跑够车辆"""
+        resting_foreground = QColor(110, 110, 110)
+        for col in range(table.columnCount()):
+            item = table.item(row, col)
+            if item:
+                item.setForeground(resting_foreground)

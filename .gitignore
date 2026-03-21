@@ -45,6 +45,8 @@ env/
 .coverage
 htmlcov/
 .tox/
+tests/.test_home/
+tests/.test_temp/
 
 # Database
 *.db

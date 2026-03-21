@@ -4,7 +4,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
-from rm_rank.models.data_models import VehicleConfig, Category
+from rm_rank.models.data_models import GarageVehicleConfig, Category
 from rm_rank.models.db_models import UserGarage, Vehicle, Account
 from rm_rank.exceptions import DatabaseError, BusinessLogicError
 from rm_rank.logger import get_logger
@@ -141,7 +141,7 @@ class GarageRepository:
             logger.error(f"移除车辆失败: {str(e)}", exc_info=True)
             raise DatabaseError(f"移除车辆失败: {str(e)}")
     
-    def get_all_garage_vehicles(self) -> List[VehicleConfig]:
+    def get_all_garage_vehicles(self) -> List[GarageVehicleConfig]:
         """获取当前账号车库中的所有车辆
         
         Returns:
@@ -162,7 +162,7 @@ class GarageRepository:
                 ).first()
                 
                 if vehicle:
-                    vehicles.append(self._to_vehicle_config(vehicle))
+                    vehicles.append(self._to_garage_vehicle_config(vehicle, entry.is_resting))
             
             return vehicles
             
@@ -255,9 +255,42 @@ class GarageRepository:
             self.session.rollback()
             logger.error(f"更新车辆阶数失败: {str(e)}", exc_info=True)
             raise DatabaseError(f"更新车辆阶数失败: {str(e)}")
+
+    def set_vehicle_resting_status(self, name: str, tier: int, is_resting: bool) -> None:
+        """设置当前账号车库车辆的休息状态"""
+        try:
+            account_id = self._get_account_id()
+
+            vehicle = self.session.query(Vehicle).filter(
+                Vehicle.name == name,
+                Vehicle.tier == tier
+            ).first()
+            if not vehicle:
+                raise BusinessLogicError(f"车辆不存在: {name} {tier}阶")
+
+            garage_entry = self.session.query(UserGarage).filter(
+                UserGarage.account_id == account_id,
+                UserGarage.vehicle_id == vehicle.id
+            ).first()
+            if not garage_entry:
+                raise BusinessLogicError(f"车辆不在车库中: {name} {tier}阶")
+
+            garage_entry.is_resting = is_resting
+            self.session.commit()
+
+            logger.info(
+                f"设置车辆休息状态 (账号ID={account_id}): {name} {tier}阶 -> {is_resting}"
+            )
+
+        except BusinessLogicError:
+            raise
+        except SQLAlchemyError as e:
+            self.session.rollback()
+            logger.error(f"设置车辆休息状态失败: {str(e)}", exc_info=True)
+            raise DatabaseError(f"设置车辆休息状态失败: {str(e)}")
     
     @staticmethod
-    def _to_vehicle_config(vehicle: Vehicle) -> VehicleConfig:
+    def _to_garage_vehicle_config(vehicle: Vehicle, is_resting: bool) -> GarageVehicleConfig:
         """将 ORM 模型转换为 Pydantic 模型
         
         Args:
@@ -266,12 +299,13 @@ class GarageRepository:
         Returns:
             Pydantic 车辆配置对象
         """
-        return VehicleConfig(
+        return GarageVehicleConfig(
             id=vehicle.id,
             name=vehicle.name,
             category=Category(vehicle.category),
             tier=vehicle.tier,
             lap_time=vehicle.lap_time,
             created_at=vehicle.created_at,
-            updated_at=vehicle.updated_at
+            updated_at=vehicle.updated_at,
+            is_resting=is_resting,
         )

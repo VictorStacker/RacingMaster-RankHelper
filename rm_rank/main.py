@@ -265,7 +265,7 @@ def main():
             # 设置 Windows 任务栏图标（AppUserModelID）
             try:
                 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-                    'RacingMaster.RankHelper.1.4'
+                    'RacingMaster.RankHelper.1.5'
                 )
             except Exception:
                 pass

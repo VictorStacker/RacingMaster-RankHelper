@@ -69,6 +69,7 @@ class UserGarage(Base):
     account_id = Column(Integer, ForeignKey('accounts.id', ondelete='CASCADE'), nullable=False)
     vehicle_id = Column(Integer, ForeignKey('vehicles.id', ondelete='CASCADE'), nullable=False)
     added_at = Column(DateTime, default=datetime.utcnow)
+    is_resting = Column(Boolean, default=False, nullable=False)
     
     # 关系
     account = relationship("Account", back_populates="garage_entries")
@@ -113,7 +114,10 @@ def init_database(database_url: str = DATABASE_URL) -> None:
         cols = [c['name'] for c in inspector.get_columns('accounts')]
         if 'sort_order' not in cols:
             conn.execute(text("ALTER TABLE accounts ADD COLUMN sort_order INTEGER DEFAULT 0"))
-            conn.commit()
+        garage_cols = [c['name'] for c in inspector.get_columns('user_garage')]
+        if 'is_resting' not in garage_cols:
+            conn.execute(text("ALTER TABLE user_garage ADD COLUMN is_resting BOOLEAN DEFAULT 0 NOT NULL"))
+        conn.commit()
 
 
 def get_session_maker(database_url: str = DATABASE_URL) -> sessionmaker:
