@@ -162,7 +162,7 @@ class GarageRepository:
                 ).first()
                 
                 if vehicle:
-                    vehicles.append(self._to_garage_vehicle_config(vehicle, entry.is_resting))
+                    vehicles.append(self._to_garage_vehicle_config(vehicle, entry))
             
             return vehicles
             
@@ -290,12 +290,13 @@ class GarageRepository:
             raise DatabaseError(f"设置车辆休息状态失败: {str(e)}")
     
     @staticmethod
-    def _to_garage_vehicle_config(vehicle: Vehicle, is_resting: bool) -> GarageVehicleConfig:
+    def _to_garage_vehicle_config(vehicle: Vehicle, entry: UserGarage) -> GarageVehicleConfig:
         """将 ORM 模型转换为 Pydantic 模型
-        
+
         Args:
             vehicle: ORM 车辆对象
-            
+            entry: ORM 车库条目对象
+
         Returns:
             Pydantic 车辆配置对象
         """
@@ -307,5 +308,98 @@ class GarageRepository:
             lap_time=vehicle.lap_time,
             created_at=vehicle.created_at,
             updated_at=vehicle.updated_at,
-            is_resting=is_resting,
+            is_resting=entry.is_resting,
+            rest_after_races=entry.rest_after_races,
+            races_completed=entry.races_completed,
         )
+
+    def _find_garage_entry(self, name: str, tier: int):
+        """查找车库条目（内部辅助方法）"""
+        account_id = self._get_account_id()
+        vehicle = self.session.query(Vehicle).filter(
+            Vehicle.name == name, Vehicle.tier == tier
+        ).first()
+        if not vehicle:
+            raise BusinessLogicError(f"车辆不存在: {name} {tier}阶")
+        entry = self.session.query(UserGarage).filter(
+            UserGarage.account_id == account_id,
+            UserGarage.vehicle_id == vehicle.id
+        ).first()
+        if not entry:
+            raise BusinessLogicError(f"车辆不在车库中: {name} {tier}阶")
+        return entry
+
+    def increment_races(self, name: str, tier: int) -> None:
+        """给车辆的已完成场次+1（不触碰 is_resting）"""
+        try:
+            entry = self._find_garage_entry(name, tier)
+            entry.races_completed += 1
+            self.session.commit()
+        except BusinessLogicError:
+            raise
+        except SQLAlchemyError as e:
+            self.session.rollback()
+            raise DatabaseError(f"记录场次失败: {str(e)}")
+
+    def decrement_races(self, name: str, tier: int) -> None:
+        """给车辆的已完成场次-1（最低为0，不触碰 is_resting）"""
+        try:
+            entry = self._find_garage_entry(name, tier)
+            if entry.races_completed > 0:
+                entry.races_completed -= 1
+            self.session.commit()
+        except BusinessLogicError:
+            raise
+        except SQLAlchemyError as e:
+            self.session.rollback()
+            raise DatabaseError(f"减少场次失败: {str(e)}")
+
+    def set_rest_after_races(self, name: str, tier: int, races: Optional[int]) -> None:
+        """设置车辆的自动休息场次数。races=None 表示不启用自动计场。"""
+        try:
+            entry = self._find_garage_entry(name, tier)
+            entry.rest_after_races = races
+            self.session.commit()
+        except BusinessLogicError:
+            raise
+        except SQLAlchemyError as e:
+            self.session.rollback()
+            raise DatabaseError(f"设置自动休息场次失败: {str(e)}")
+
+    def reset_races(self, name: str, tier: int) -> None:
+        """重置车辆的已完成场次为0（不触碰 is_resting）"""
+        try:
+            entry = self._find_garage_entry(name, tier)
+            entry.races_completed = 0
+            self.session.commit()
+        except BusinessLogicError:
+            raise
+        except SQLAlchemyError as e:
+            self.session.rollback()
+            raise DatabaseError(f"重置场次失败: {str(e)}")
+
+    def batch_set_rest_after_races(self, races: Optional[int]) -> int:
+        """为当前账号所有车辆设置自动休息场次数"""
+        try:
+            account_id = self._get_account_id()
+            count = self.session.query(UserGarage).filter(
+                UserGarage.account_id == account_id
+            ).update({UserGarage.rest_after_races: races})
+            self.session.commit()
+            return count
+        except SQLAlchemyError as e:
+            self.session.rollback()
+            raise DatabaseError(f"批量设置自动休息场次失败: {str(e)}")
+
+    def batch_reset_races(self) -> int:
+        """重置当前账号所有车辆的场次计数为0（不触碰 is_resting）"""
+        try:
+            account_id = self._get_account_id()
+            count = self.session.query(UserGarage).filter(
+                UserGarage.account_id == account_id
+            ).update({UserGarage.races_completed: 0})
+            self.session.commit()
+            return count
+        except SQLAlchemyError as e:
+            self.session.rollback()
+            raise DatabaseError(f"批量重置场次失败: {str(e)}")

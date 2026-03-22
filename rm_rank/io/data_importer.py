@@ -198,6 +198,10 @@ class DataImporter:
                     self.garage_repo.set_vehicle_resting_status(
                         item["name"], item["tier"], is_resting
                     )
+                    # 恢复自动计场设置
+                    rest_after = item.get("rest_after_races")
+                    if rest_after is not None:
+                        self.garage_repo.set_rest_after_races(item["name"], item["tier"], rest_after)
                 else:
                     logger.warning(
                         f"跳过不存在的车辆: {item['name']} {item['tier']}阶"
@@ -268,6 +272,9 @@ class DataImporter:
                         self.garage_repo.set_vehicle_resting_status(
                             item["name"], item["tier"], is_resting
                         )
+                        rest_after = item.get("rest_after_races")
+                        if rest_after is not None:
+                            self.garage_repo.set_rest_after_races(item["name"], item["tier"], rest_after)
                     else:
                         logger.warning(
                             f"跳过不存在的车辆: {item['name']} {item['tier']}阶"
@@ -505,6 +512,9 @@ class DataImporter:
                             self.garage_repo.set_vehicle_resting_status(
                                 item["name"], item["tier"], is_resting
                             )
+                            rest_after = item.get("rest_after_races")
+                            if rest_after is not None:
+                                self.garage_repo.set_rest_after_races(item["name"], item["tier"], rest_after)
                         else:
                             logger.warning(
                                 f"跳过不存在的车辆: {item['name']} {item['tier']}阶"

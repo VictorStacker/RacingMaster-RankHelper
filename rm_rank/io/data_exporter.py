@@ -302,4 +302,10 @@ class DataExporter:
         }
         if include_resting:
             data["is_resting"] = getattr(vehicle, "is_resting", False)
+            rest_after = getattr(vehicle, "rest_after_races", None)
+            if rest_after is not None:
+                data["rest_after_races"] = rest_after
+            races = getattr(vehicle, "races_completed", 0)
+            if races > 0:
+                data["races_completed"] = races
         return data

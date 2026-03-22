@@ -44,6 +44,17 @@ class VehicleConfig(BaseModel):
 class GarageVehicleConfig(VehicleConfig):
     """车库中的车辆配置，包含账号级状态"""
     is_resting: bool = False
+    rest_after_races: Optional[int] = None  # 几场后自动休息，None=不启用
+    races_completed: int = 0  # 已完成场次
+
+    @property
+    def is_effectively_resting(self) -> bool:
+        """有效休息状态：手动停用 或 场次达标"""
+        if self.is_resting:
+            return True
+        if self.rest_after_races is not None and self.races_completed >= self.rest_after_races:
+            return True
+        return False
 
 
 class RankedVehicle(BaseModel):

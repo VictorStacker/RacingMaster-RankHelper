@@ -51,21 +51,40 @@ class GarageView(QWidget):
             # 加载账号列表
             self.load_accounts()
         
-        # 按钮栏
-        button_layout = QHBoxLayout()
-        
+        # 工具栏（合并按钮和场次操作为一行）
+        toolbar_layout = QHBoxLayout()
+
         add_button = QPushButton("添加车辆")
         add_button.clicked.connect(self.add_vehicle)
-        button_layout.addWidget(add_button)
-        
+        toolbar_layout.addWidget(add_button)
+
         self.delete_button = QPushButton("移出车库")
         self.delete_button.clicked.connect(self.toggle_delete_mode)
-        button_layout.addWidget(self.delete_button)
-        
-        button_layout.addStretch()
-        
-        layout.addLayout(button_layout)
-        
+        toolbar_layout.addWidget(self.delete_button)
+
+        toolbar_layout.addSpacing(15)
+
+        toolbar_layout.addWidget(QLabel("休息场次:"))
+        self.global_races_spin = QSpinBox()
+        self.global_races_spin.setMinimum(1)
+        self.global_races_spin.setMaximum(99)
+        self.global_races_spin.setValue(5)
+        self.global_races_spin.setSuffix("场")
+        toolbar_layout.addWidget(self.global_races_spin)
+
+        apply_global_button = QPushButton("应用")
+        apply_global_button.setToolTip("将此场次数应用到当前账号所有车辆")
+        apply_global_button.clicked.connect(self.apply_global_races)
+        toolbar_layout.addWidget(apply_global_button)
+
+        batch_reset_button = QPushButton("重置")
+        batch_reset_button.setToolTip("重置所有车辆的场次计数（新赛季用）")
+        batch_reset_button.clicked.connect(self.batch_reset_all_races)
+        toolbar_layout.addWidget(batch_reset_button)
+
+        toolbar_layout.addStretch()
+        layout.addLayout(toolbar_layout)
+
         # 删除模式标志
         self.delete_mode = False
         
@@ -92,7 +111,7 @@ class GarageView(QWidget):
         
         # 说明文字（标签页下方）
         note_label = QLabel(
-            "💡 圈速总和 (数值越小越快) - 已标记“已跑够”的车辆会置后并以灰色弱化显示"
+            "💡 圈速总和 (数值越小越快) - 已停用或已跑够场次的车辆会置后并以灰色弱化显示"
         )
         note_label.setStyleSheet(
             "color: #555; font-size: 12px; padding: 8px 15px; "
@@ -113,6 +132,7 @@ class GarageView(QWidget):
         # 设置表格属性
         table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         
         # 优化列宽分配
         header = table.horizontalHeader()
@@ -125,17 +145,20 @@ class GarageView(QWidget):
         header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)  # 状态列固定
         header.setSectionResizeMode(7, QHeaderView.ResizeMode.Fixed)  # 操作列固定
 
-        table.setColumnWidth(0, 30)   # 勾选框列
-        table.setColumnWidth(1, 50)   # ID列
-        table.setColumnWidth(3, 80)   # 组别列
-        table.setColumnWidth(4, 60)   # 阶数列
-        table.setColumnWidth(5, 120)  # 圈速列
-        table.setColumnWidth(6, 80)   # 状态列
-        table.setColumnWidth(7, 170)  # 操作列
-        
-        # 隐藏勾选框列（默认不显示）
+        table.setColumnWidth(0, 28)   # 勾选框列
+        table.setColumnWidth(1, 45)   # 总榜列
+        table.setColumnWidth(3, 60)   # 组别列
+        table.setColumnWidth(4, 40)   # 阶数列
+        table.setColumnWidth(5, 80)   # 圈速列
+        table.setColumnWidth(6, 90)   # 状态列
+        table.setColumnWidth(7, 220)  # 操作列
+
+        # 默认隐藏勾选框列（删除模式才显示）
         table.setColumnHidden(0, True)
-        
+
+        # 双击行触发调整阶数
+        table.cellDoubleClicked.connect(self._on_cell_double_clicked)
+
         return table
         
     def refresh(self):
@@ -144,7 +167,7 @@ class GarageView(QWidget):
             vehicles = self.garage_repo.get_all_garage_vehicles()
             
             # 按圈速排序（从小到大）
-            vehicles.sort(key=lambda v: (v.is_resting, v.lap_time))
+            vehicles.sort(key=lambda v: (v.is_effectively_resting, v.lap_time))
             
             # 建立总榜排名映射 {vehicle_id: rank}
             rank_map = {}
@@ -208,7 +231,19 @@ class GarageView(QWidget):
             lap_time_item = QTableWidgetItem(f"{v.lap_time:.1f} s")
             lap_time_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
-            status_item = QTableWidgetItem("已跑够" if v.is_resting else "正常")
+            # 状态列：显示停用状态和场次进度
+            parts = []
+            if v.is_resting:
+                parts.append("已停用")
+            if v.rest_after_races is not None:
+                progress = f"{v.races_completed}/{v.rest_after_races}"
+                if v.races_completed >= v.rest_after_races:
+                    progress += "\u2713"
+                parts.append(progress)
+            elif v.races_completed > 0:
+                parts.append(f"已跑{v.races_completed}场")
+            status_text = " ".join(parts) if parts else "正常"
+            status_item = QTableWidgetItem(status_text)
             status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
             table.setItem(row, 1, rank_item)
@@ -218,7 +253,7 @@ class GarageView(QWidget):
             table.setItem(row, 5, lap_time_item)
             table.setItem(row, 6, status_item)
 
-            if v.is_resting:
+            if v.is_effectively_resting:
                 self._apply_resting_row_style(
                     checkbox,
                     rank_item,
@@ -230,12 +265,12 @@ class GarageView(QWidget):
                 )
 
             # 添加操作按钮（居中）
-            adjust_button = QPushButton("调整")
-            adjust_button.setMaximumWidth(70)
-            adjust_button.clicked.connect(lambda checked, name=v.name, tier=v.tier: self.adjust_tier(name, tier))
+            upgrade_button = QPushButton("升阶")
+            upgrade_button.setFixedWidth(42)
+            upgrade_button.clicked.connect(lambda checked, name=v.name, tier=v.tier: self.adjust_tier(name, tier))
 
-            resting_button = QPushButton("取消休息" if v.is_resting else "标记休息")
-            resting_button.setMaximumWidth(80)
+            resting_button = QPushButton("启用" if v.is_resting else "停用")
+            resting_button.setFixedWidth(42)
             resting_button.clicked.connect(
                 lambda checked, name=v.name, tier=v.tier, resting=not v.is_resting: self.set_vehicle_resting_status(
                     name,
@@ -244,12 +279,29 @@ class GarageView(QWidget):
                 )
             )
 
+            minus_one_button = QPushButton("-1场")
+            minus_one_button.setFixedWidth(45)
+            minus_one_button.setToolTip("已跑场次-1")
+            minus_one_button.clicked.connect(
+                lambda checked, name=v.name, tier=v.tier: self.decrement_single_race(name, tier)
+            )
+
+            plus_one_button = QPushButton("+1场")
+            plus_one_button.setFixedWidth(45)
+            plus_one_button.setToolTip("已跑场次+1")
+            plus_one_button.clicked.connect(
+                lambda checked, name=v.name, tier=v.tier: self.increment_single_race(name, tier)
+            )
+
             container = QWidget()
             container_layout = QHBoxLayout(container)
-            container_layout.addWidget(adjust_button)
+            container_layout.addWidget(upgrade_button)
             container_layout.addWidget(resting_button)
+            container_layout.addWidget(minus_one_button)
+            container_layout.addWidget(plus_one_button)
             container_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
             container_layout.setContentsMargins(0, 0, 0, 0)
+            container_layout.setSpacing(2)
             table.setCellWidget(row, 7, container)
             
     def add_vehicle(self):
@@ -329,28 +381,25 @@ class GarageView(QWidget):
     def toggle_delete_mode(self):
         """切换删除模式"""
         self.delete_mode = not self.delete_mode
-        
+
         # 获取所有表格
         tables = [self.all_table, self.sports_table, self.performance_table, self.extreme_table]
-        
+
         if self.delete_mode:
-            # 进入删除模式
-            self.delete_button.setText("确认移出")
-            self.delete_button.setStyleSheet("background-color: #f44336; color: white;")
-            
-            # 显示所有表格的勾选框列
+            # 进入删除模式：显示勾选框
             for table in tables:
                 table.setColumnHidden(0, False)
+            self.delete_button.setText("确认移出")
+            self.delete_button.setStyleSheet("background-color: #f44336; color: white;")
         else:
             # 退出删除模式 - 先执行删除，再清理UI
-            # 执行删除操作
             self.remove_checked_vehicles()
-            
-            # 然后恢复UI状态
+
+            # 恢复UI状态
             self.delete_button.setText("移出车库")
             self.delete_button.setStyleSheet("")
-            
-            # 隐藏所有表格的勾选框列并取消所有勾选
+
+            # 隐藏勾选框并取消所有勾选
             for table in tables:
                 table.setColumnHidden(0, True)
                 for row in range(table.rowCount()):
@@ -436,6 +485,77 @@ class GarageView(QWidget):
                         
             self.refresh()
             QMessageBox.information(self, "成功", "已删除选中的车辆")
+
+    def increment_single_race(self, name: str, tier: int):
+        """单车场次+1"""
+        try:
+            self.garage_repo.increment_races(name, tier)
+            self.refresh()
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"记录场次失败：{str(e)}")
+
+    def decrement_single_race(self, name: str, tier: int):
+        """单车场次-1"""
+        try:
+            self.garage_repo.decrement_races(name, tier)
+            self.refresh()
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"减少场次失败：{str(e)}")
+
+    def _on_cell_double_clicked(self, row, column):
+        """双击行触发调整阶数"""
+        # 找到发送信号的表格
+        table = self.sender()
+        if not table:
+            return
+        name_item = table.item(row, 2)
+        tier_item = table.item(row, 4)
+        if name_item and tier_item:
+            name = name_item.text()
+            tier = int(tier_item.text())
+            self.adjust_tier(name, tier)
+
+    def apply_global_races(self):
+        """应用全局默认场次到所有车辆"""
+        races = self.global_races_spin.value()
+        try:
+            count = self.garage_repo.batch_set_rest_after_races(races)
+            QMessageBox.information(self, "成功", f"已为 {count} 辆车设置自动休息场次为 {races} 场")
+            self.refresh()
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"设置失败：{str(e)}")
+
+    def batch_reset_all_races(self):
+        """全部重置场次计数"""
+        reply = QMessageBox.question(
+            self, "确认", "确定要重置当前账号所有车辆的场次计数吗？\n（通常在新赛季开始时使用，不影响手动停用状态）",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                count = self.garage_repo.batch_reset_races()
+                QMessageBox.information(self, "成功", f"已重置 {count} 辆车的场次计数")
+                self.refresh()
+            except Exception as e:
+                QMessageBox.critical(self, "错误", f"重置失败：{str(e)}")
+
+    def _get_checked_vehicles(self):
+        """获取当前标签页中勾选的车辆列表"""
+        current_tab_index = self.tabs.currentIndex()
+        tables = [self.all_table, self.extreme_table, self.performance_table, self.sports_table]
+        table = tables[current_tab_index]
+        checked = []
+        for row in range(table.rowCount()):
+            checkbox = table.item(row, 0)
+            if checkbox and checkbox.checkState() == Qt.CheckState.Checked:
+                name_item = table.item(row, 2)
+                tier_item = table.item(row, 4)
+                if name_item and tier_item:
+                    name = name_item.text()
+                    tier = int(tier_item.text())
+                    if (name, tier) not in checked:
+                        checked.append((name, tier))
+        return checked
 
     @staticmethod
     def _apply_resting_row_style(*items):

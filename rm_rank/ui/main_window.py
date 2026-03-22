@@ -89,7 +89,14 @@ class MainWindow(QMainWindow):
     def init_ui(self):
         """初始化用户界面"""
         self.setWindowTitle("巅峰极速车辆数据及排位计分车推荐")
-        self.setGeometry(100, 100, 800, 800)
+        self.setGeometry(100, 100, 720, 600)
+
+        # 恢复窗口几何信息
+        from rm_rank.config import load_preferences
+        prefs = load_preferences()
+        saved_geometry = prefs.get("window_geometry")
+        if saved_geometry and isinstance(saved_geometry, list) and len(saved_geometry) == 4:
+            self.setGeometry(*saved_geometry)
         
         # 创建菜单栏
         self.create_menu_bar()
@@ -541,6 +548,15 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logger.error(f"更新账号状态失败: {str(e)}")
             self.statusBar().showMessage("就绪")
+
+    def closeEvent(self, event):
+        """窗口关闭时保存几何信息"""
+        from rm_rank.config import load_preferences, save_preferences
+        geo = self.geometry()
+        prefs = load_preferences()
+        prefs["window_geometry"] = [geo.x(), geo.y(), geo.width(), geo.height()]
+        save_preferences(prefs)
+        super().closeEvent(event)
 
 
 def run_gui():

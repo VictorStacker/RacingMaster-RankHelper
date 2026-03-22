@@ -70,7 +70,7 @@ def build_display_rows(ranked_vehicles):
             {
                 "ranked_vehicle": ranked_vehicle,
                 "category_rank": category_counters[category_name],
-                "is_resting": getattr(ranked_vehicle.vehicle, "is_resting", False),
+                "is_resting": getattr(ranked_vehicle.vehicle, "is_effectively_resting", False),
             }
         )
 
@@ -154,13 +154,19 @@ class RecommendationView(QWidget):
             # 使用元组作为data，方便后续使用
             self.vehicle_count_combo.addItem(display_text, (extreme, performance, sports))
         
-        # 设置默认值为精英联赛5的配置
-        default_config = LEAGUE_CONFIGS["精英联赛5"]
+        # 根据保存的偏好恢复计分车辆配置
+        saved_vehicle_config = prefs.get("last_vehicle_config")
+        if saved_vehicle_config and isinstance(saved_vehicle_config, list) and len(saved_vehicle_config) == 3:
+            target_config = tuple(saved_vehicle_config)
+        else:
+            target_config = LEAGUE_CONFIGS.get(saved_league, LEAGUE_CONFIGS["精英联赛5"])
+
         for i in range(self.vehicle_count_combo.count()):
-            if self.vehicle_count_combo.itemData(i) == default_config:
+            if self.vehicle_count_combo.itemData(i) == target_config:
                 self.vehicle_count_combo.setCurrentIndex(i)
                 break
-        
+
+        self.vehicle_count_combo.currentIndexChanged.connect(self.on_vehicle_config_changed)
         control_layout.addWidget(self.vehicle_count_combo)
         
         control_layout.addSpacing(20)
@@ -181,7 +187,7 @@ class RecommendationView(QWidget):
         
         # 说明文字
         note_label = QLabel(
-            "圈速总和 (数值越小越快) - 已跑够车辆会在推荐页置底显示，但保留原始推荐序"
+            "圈速总和 (数值越小越快) - 已停用或已跑够场次的车辆会在推荐页置底显示，但保留原始推荐序"
         )
         note_label.setStyleSheet(
             "color: #666; font-size: 12px; padding: 5px 10px; "
@@ -304,10 +310,22 @@ class RecommendationView(QWidget):
             from rm_rank.config import load_preferences, save_preferences
             prefs = load_preferences()
             prefs["last_league"] = league_name
+            prefs["last_vehicle_config"] = list(config)
             save_preferences(prefs)
         
         self._updating_from_league = False
-    
+
+    def on_vehicle_config_changed(self, index):
+        """计分车辆配置改变时保存到偏好"""
+        if self._updating_from_league:
+            return
+        config = self.vehicle_count_combo.currentData()
+        if config:
+            from rm_rank.config import load_preferences, save_preferences
+            prefs = load_preferences()
+            prefs["last_vehicle_config"] = list(config)
+            save_preferences(prefs)
+
     def refresh(self):
         """刷新视图"""
         # 推荐视图不需要自动刷新，由用户手动触发
@@ -365,7 +383,7 @@ class RecommendationView(QWidget):
             resting_selected_count = sum(
                 1
                 for ranked_vehicle in all_result.vehicles
-                if getattr(ranked_vehicle.vehicle, "is_resting", False)
+                if getattr(ranked_vehicle.vehicle, "is_effectively_resting", False)
             )
             self.stats_label.setText(
                 f"车库共有 {garage_count} 辆车 | "
@@ -412,7 +430,7 @@ class RecommendationView(QWidget):
             ranked_vehicle = display_row["ranked_vehicle"]
             v = ranked_vehicle.vehicle
             category_name = v.category.value
-            is_resting = getattr(v, "is_resting", False)
+            is_resting = getattr(v, "is_effectively_resting", False)
             category_rank = display_row["category_rank"]
             
             # 根据组别内排名确定背景色
@@ -429,7 +447,7 @@ class RecommendationView(QWidget):
             col += 1
             
             # 车型列
-            name_text = f"{v.name}（已跑够）" if is_resting else v.name
+            name_text = f"{v.name}（休息中）" if is_resting else v.name
             name_item = QTableWidgetItem(name_text)
             name_item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             name_item.setBackground(color)

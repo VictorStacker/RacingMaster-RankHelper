@@ -70,7 +70,9 @@ class UserGarage(Base):
     vehicle_id = Column(Integer, ForeignKey('vehicles.id', ondelete='CASCADE'), nullable=False)
     added_at = Column(DateTime, default=datetime.utcnow)
     is_resting = Column(Boolean, default=False, nullable=False)
-    
+    rest_after_races = Column(Integer, nullable=True, default=None)  # 几场后自动休息
+    races_completed = Column(Integer, nullable=False, default=0)     # 已完成场次
+
     # 关系
     account = relationship("Account", back_populates="garage_entries")
     vehicle = relationship("Vehicle", back_populates="garage_entries")
@@ -117,6 +119,10 @@ def init_database(database_url: str = DATABASE_URL) -> None:
         garage_cols = [c['name'] for c in inspector.get_columns('user_garage')]
         if 'is_resting' not in garage_cols:
             conn.execute(text("ALTER TABLE user_garage ADD COLUMN is_resting BOOLEAN DEFAULT 0 NOT NULL"))
+        if 'rest_after_races' not in garage_cols:
+            conn.execute(text("ALTER TABLE user_garage ADD COLUMN rest_after_races INTEGER DEFAULT NULL"))
+        if 'races_completed' not in garage_cols:
+            conn.execute(text("ALTER TABLE user_garage ADD COLUMN races_completed INTEGER DEFAULT 0 NOT NULL"))
         conn.commit()
 
 
