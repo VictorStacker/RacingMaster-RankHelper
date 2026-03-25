@@ -111,15 +111,24 @@ class GarageView(QWidget):
         
         # 说明文字（标签页下方）
         note_label = QLabel(
-            "💡 圈速总和 (数值越小越快) - 已停用或已跑够场次的车辆会置后并以灰色弱化显示"
+            "💡 圈速总和 (数值越小越快) - 已停用或已跑够场次的车辆会置后并以灰色弱化显示"
         )
         note_label.setStyleSheet(
             "color: #555; font-size: 12px; padding: 8px 15px; "
             "background-color: #fffbea; border-left: 3px solid #f59e0b; "
             "border-radius: 3px; margin: 5px 0px;"
         )
+        # 场次统计栏
+        self.stats_label = QLabel("统计加载中...")
+        self.stats_label.setStyleSheet(
+            "color: #333; font-size: 12px; padding: 6px 15px; "
+            "background-color: #f0f4f8; border-left: 3px solid #6366f1; "
+            "border-radius: 3px; margin: 2px 0px;"
+        )
+        layout.addWidget(self.stats_label)
+
         layout.addWidget(note_label)
-        
+
         # 初始加载数据
         self.refresh()
     
@@ -193,7 +202,15 @@ class GarageView(QWidget):
             self.tabs.setTabText(1, f"极限组 ({len(extreme_vehicles)})")
             self.tabs.setTabText(2, f"性能组 ({len(performance_vehicles)})")
             self.tabs.setTabText(3, f"运动组 ({len(sports_vehicles)})")
-                
+
+            # 更新场次统计
+            total = len(all_vehicles)
+            resting = sum(1 for v in all_vehicles if v.is_effectively_resting)
+            active = total - resting
+            total_races = sum(v.races_completed for v in all_vehicles)
+            stats_parts = [f"共 {total} 辆车", f"出赛中 {active} 辆", f"休息中 {resting} 辆", f"累计场次 {total_races} 场"]
+            self.stats_label.setText("  |  ".join(stats_parts))
+
         except Exception as e:
             logger.error(f"刷新车库失败: {str(e)}", exc_info=True)
     

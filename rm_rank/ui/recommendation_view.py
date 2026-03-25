@@ -327,9 +327,13 @@ class RecommendationView(QWidget):
             save_preferences(prefs)
 
     def refresh(self):
-        """刷新视图"""
-        # 推荐视图不需要自动刷新，由用户手动触发
-        pass
+        """账号切换时清空推荐结果，提示用户重新生成"""
+        for table in [self.all_table, self.extreme_table, self.performance_table, self.sports_table]:
+            table.setRowCount(0)
+        self.tabs.setTabText(0, "全部推荐")
+        self.tabs.setTabText(1, "极限组")
+        self.tabs.setTabText(2, "性能组")
+        self.tabs.setTabText(3, "运动组")
     
     def generate_all_recommendations(self):
         """生成所有组别的推荐"""
