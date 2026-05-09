@@ -31,7 +31,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='RacingMaster-RankHelper',
+    name='RacingMaster-RankHelper-v1.8',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -45,4 +45,5 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=['icon.ico'],
+    version='file_version_info.txt',
 )

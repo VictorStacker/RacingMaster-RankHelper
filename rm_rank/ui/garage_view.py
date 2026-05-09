@@ -135,8 +135,8 @@ class GarageView(QWidget):
     def create_table(self):
         """创建表格"""
         table = QTableWidget()
-        table.setColumnCount(8)
-        table.setHorizontalHeaderLabels(["", "总榜", "车型", "组别", "阶数", "圈速(秒)", "状态", "操作"])
+        table.setColumnCount(9)
+        table.setHorizontalHeaderLabels(["", "总榜", "车库序", "车型", "组别", "阶数", "圈速(秒)", "状态", "操作"])
         
         # 设置表格属性
         table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -147,20 +147,23 @@ class GarageView(QWidget):
         header = table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)  # 勾选框列固定
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)  # ID列固定
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)  # 车型列拉伸
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)  # 组别列固定
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)  # 阶数列固定
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)  # 圈速列固定
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)  # 状态列固定
-        header.setSectionResizeMode(7, QHeaderView.ResizeMode.Fixed)  # 操作列固定
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)  # 车库序列固定
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)  # 车型列拉伸
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)  # 组别列固定
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)  # 阶数列固定
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)  # 圈速列固定
+        header.setSectionResizeMode(7, QHeaderView.ResizeMode.Fixed)  # 状态列固定
+        header.setSectionResizeMode(8, QHeaderView.ResizeMode.Fixed)  # 操作列固定
 
         table.setColumnWidth(0, 28)   # 勾选框列
         table.setColumnWidth(1, 45)   # 总榜列
-        table.setColumnWidth(3, 60)   # 组别列
-        table.setColumnWidth(4, 40)   # 阶数列
-        table.setColumnWidth(5, 80)   # 圈速列
-        table.setColumnWidth(6, 90)   # 状态列
-        table.setColumnWidth(7, 220)  # 操作列
+        table.setColumnWidth(2, 55)   # 车库序列
+        table.setColumnWidth(3, 120)  # 车型列
+        table.setColumnWidth(4, 60)   # 组别列
+        table.setColumnWidth(5, 40)   # 阶数列
+        table.setColumnWidth(6, 80)   # 圈速列
+        table.setColumnWidth(7, 90)   # 状态列
+        table.setColumnWidth(8, 220)  # 操作列
 
         # 默认隐藏勾选框列（删除模式才显示）
         table.setColumnHidden(0, True)
@@ -175,8 +178,7 @@ class GarageView(QWidget):
         try:
             vehicles = self.garage_repo.get_all_garage_vehicles()
             
-            # 按圈速排序（从小到大）
-            vehicles.sort(key=lambda v: (v.is_effectively_resting, v.lap_time))
+            # 车库内固定排序：按添加顺序读取，展示时再按总榜计算车库序
             
             # 建立总榜排名映射 {vehicle_id: rank}
             rank_map = {}
@@ -219,8 +221,27 @@ class GarageView(QWidget):
         # 清空表格
         table.setRowCount(0)
         
-        # 填充数据
+        # 车库序固定按总榜名次计算；显示顺序则按休息状态下移
+        garage_order = {}
+        sorted_by_rank = []
         for v in vehicles:
+            rank = rank_map.get(v.id, None) if rank_map else None
+            sort_rank = rank if isinstance(rank, int) else 10**9
+            sorted_by_rank.append((sort_rank, v))
+        sorted_by_rank.sort(key=lambda x: x[0])
+        for garage_index, (_, v) in enumerate(sorted_by_rank, start=1):
+            garage_order[v.id] = garage_index
+
+        sortable = []
+        for v in vehicles:
+            rank = rank_map.get(v.id, None) if rank_map else None
+            sort_rank = rank if isinstance(rank, int) else 10**9
+            rest_flag = 1 if v.is_effectively_resting else 0
+            sortable.append((rest_flag, sort_rank, v))
+        sortable.sort(key=lambda x: (x[0], x[1]))
+
+        # 填充数据
+        for _, _, v in sortable:
             row = table.rowCount()
             table.insertRow(row)
             
@@ -235,6 +256,10 @@ class GarageView(QWidget):
             rank = rank_map.get(v.id, "-") if rank_map else "-"
             rank_item = QTableWidgetItem(str(rank))
             rank_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            
+            # 车库序：固定按总榜名次排序计算，不随下移改变
+            garage_rank_item = QTableWidgetItem(str(garage_order.get(v.id, "-")))
+            garage_rank_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             
             name_item = QTableWidgetItem(v.name)
             name_item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
@@ -264,16 +289,18 @@ class GarageView(QWidget):
             status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
             table.setItem(row, 1, rank_item)
-            table.setItem(row, 2, name_item)
-            table.setItem(row, 3, category_item)
-            table.setItem(row, 4, tier_item)
-            table.setItem(row, 5, lap_time_item)
-            table.setItem(row, 6, status_item)
+            table.setItem(row, 2, garage_rank_item)
+            table.setItem(row, 3, name_item)
+            table.setItem(row, 4, category_item)
+            table.setItem(row, 5, tier_item)
+            table.setItem(row, 6, lap_time_item)
+            table.setItem(row, 7, status_item)
 
             if v.is_effectively_resting:
                 self._apply_resting_row_style(
                     checkbox,
                     rank_item,
+                    garage_rank_item,
                     name_item,
                     category_item,
                     tier_item,
@@ -319,7 +346,7 @@ class GarageView(QWidget):
             container_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
             container_layout.setContentsMargins(0, 0, 0, 0)
             container_layout.setSpacing(2)
-            table.setCellWidget(row, 7, container)
+            table.setCellWidget(row, 8, container)
             
     def add_vehicle(self):
         """添加车辆对话框（支持连续添加）"""
@@ -490,8 +517,8 @@ class GarageView(QWidget):
         if reply == QMessageBox.StandardButton.Yes:
             for index in selected_rows:
                 row = index.row()
-                name_item = current_table.item(row, 2)
-                tier_item = current_table.item(row, 4)
+                name_item = current_table.item(row, 3)
+                tier_item = current_table.item(row, 5)
                 if name_item and tier_item:
                     name = name_item.text()
                     tier = int(tier_item.text())
@@ -525,8 +552,8 @@ class GarageView(QWidget):
         table = self.sender()
         if not table:
             return
-        name_item = table.item(row, 2)
-        tier_item = table.item(row, 4)
+        name_item = table.item(row, 3)
+        tier_item = table.item(row, 5)
         if name_item and tier_item:
             name = name_item.text()
             tier = int(tier_item.text())
@@ -565,8 +592,8 @@ class GarageView(QWidget):
         for row in range(table.rowCount()):
             checkbox = table.item(row, 0)
             if checkbox and checkbox.checkState() == Qt.CheckState.Checked:
-                name_item = table.item(row, 2)
-                tier_item = table.item(row, 4)
+                name_item = table.item(row, 3)
+                tier_item = table.item(row, 5)
                 if name_item and tier_item:
                     name = name_item.text()
                     tier = int(tier_item.text())
