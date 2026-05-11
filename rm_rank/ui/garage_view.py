@@ -463,8 +463,8 @@ class GarageView(QWidget):
             for row in range(table.rowCount()):
                 checkbox = table.item(row, 0)
                 if checkbox and checkbox.checkState() == Qt.CheckState.Checked:
-                    name_item = table.item(row, 2)
-                    tier_item = table.item(row, 4)
+                    name_item = table.item(row, 3)
+                    tier_item = table.item(row, 5)
                     if name_item and tier_item:
                         name = name_item.text()
                         tier = int(tier_item.text())
